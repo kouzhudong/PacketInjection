@@ -76,7 +76,10 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
 
     written = printf("%ls", time);
 
+    #pragma prefast(push)
+    #pragma prefast(disable: 33010, "已取消选中充当索引的枚举 Level 的下限。")
     written = printf("%ls", g_log_level_w[Level]);
+    #pragma prefast(pop)    
 
     written = vprintf(Format, args);
 
