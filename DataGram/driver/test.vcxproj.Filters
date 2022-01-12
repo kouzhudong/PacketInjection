@@ -25,7 +25,7 @@
     <ClCompile Include="communication.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="wfp.c">
+    <ClCompile Include="Register.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SystemThread.c">
@@ -45,7 +45,7 @@
     <ClInclude Include="communication.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="wfp.h">
+    <ClInclude Include="Register.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="SystemThread.h">

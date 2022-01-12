@@ -1,6 +1,6 @@
 #include "DriverEntry.h"
 #include "communication.h"
-#include "wfp.h"
+#include "Register.h"
 #include "SystemThread.h"
 #include "CommunicationPort.h"
 

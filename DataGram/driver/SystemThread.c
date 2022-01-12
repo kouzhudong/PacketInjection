@@ -1,5 +1,5 @@
 #include "SystemThread.h"
-#include "wfp.h"
+#include "Register.h"
 #include "CommunicationPort.h"
 #include "..\public\public.h"
 

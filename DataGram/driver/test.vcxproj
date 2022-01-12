@@ -202,7 +202,7 @@
     <ClCompile Include="CommunicationPort.c" />
     <ClCompile Include="DriverEntry.c" />
     <ClCompile Include="SystemThread.c" />
-    <ClCompile Include="wfp.c" />
+    <ClCompile Include="Register.c" />
   </ItemGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
@@ -219,7 +219,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="SystemThread.h" />
     <ClInclude Include="Trace.h" />
-    <ClInclude Include="wfp.h" />
+    <ClInclude Include="Register.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
