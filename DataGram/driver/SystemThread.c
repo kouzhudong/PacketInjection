@@ -91,8 +91,8 @@ void FreeUDPPendedPacket(_Inout_ __drv_freesMem(Mem) PPENDED_PACKET packet,
 void FreePendedPacket(_Inout_ __drv_freesMem(Mem) PPENDED_PACKET packet,
                       _Inout_opt_ __drv_freesMem(Mem) WSACMSGHDR * controlData)
 {
-    if (packet->belongingFlow->calloutId == g_CallOutId.DATAGRAM_DATA_V4 ||
-               packet->belongingFlow->calloutId == g_CallOutId.DATAGRAM_DATA_V6) {
+    if (packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4] ||
+               packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
         FreeUDPPendedPacket(packet, controlData);
     } else {
         PrintEx(DPFLTR_IHVNETWORK_ID,
@@ -229,8 +229,8 @@ NTSTATUS inject(PPENDED_PACKET packet)
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
-    if (packet->belongingFlow->calloutId == g_CallOutId.DATAGRAM_DATA_V4 ||
-               packet->belongingFlow->calloutId == g_CallOutId.DATAGRAM_DATA_V6) {
+    if (packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4] ||
+               packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
         if (packet->direction == FWP_DIRECTION_OUTBOUND) {
             status = UDPOutboundInject(packet);
         } else {
