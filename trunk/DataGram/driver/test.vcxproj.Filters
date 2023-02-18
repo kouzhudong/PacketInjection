@@ -34,6 +34,9 @@
     <ClCompile Include="CommunicationPort.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DataGram.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DriverEntry.h">
@@ -55,6 +58,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DataGram.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
