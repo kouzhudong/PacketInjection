@@ -199,12 +199,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Accept.c" />
     <ClCompile Include="communication.c" />
     <ClCompile Include="CommunicationPort.c" />
+    <ClCompile Include="Connect.c" />
     <ClCompile Include="DataGram.c" />
     <ClCompile Include="DriverEntry.c" />
     <ClCompile Include="SystemThread.c" />
     <ClCompile Include="Register.c" />
+    <ClCompile Include="Transport.c" />
   </ItemGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
@@ -215,14 +218,17 @@
     <None Include="readme.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Accept.h" />
     <ClInclude Include="communication.h" />
     <ClInclude Include="CommunicationPort.h" />
+    <ClInclude Include="Connect.h" />
     <ClInclude Include="DataGram.h" />
     <ClInclude Exclude="@(ClInclude)" Include="DriverEntry.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="SystemThread.h" />
     <ClInclude Include="Trace.h" />
     <ClInclude Include="Register.h" />
+    <ClInclude Include="Transport.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

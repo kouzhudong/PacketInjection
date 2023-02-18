@@ -37,6 +37,15 @@
     <ClCompile Include="DataGram.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Connect.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Accept.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Transport.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DriverEntry.h">
@@ -61,6 +70,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DataGram.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Connect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Accept.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Transport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

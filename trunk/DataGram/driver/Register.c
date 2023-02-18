@@ -1013,6 +1013,28 @@ CALLOUT_FILTER g_CalloutFilter[] =
     {&FWPM_LAYER_DATAGRAM_DATA_V6,             DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V6_DISCARD,   DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
 
+    //注册CONNECT相关的处理。
+    //{&FWPM_LAYER_ALE_AUTH_CONNECT_V4,             ConnectClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_CONNECT_V4_DISCARD,     ConnectClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_CONNECT_V6,             ConnectClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_CONNECT_V6_DISCARD,     ConnectClassifyFn,  NotifyFn,   FlowDeleteFn},
+
+    //注册Accept相关的处理。
+    //{&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,             AcceptClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4_DISCARD,     AcceptClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,             AcceptClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6_DISCARD,     AcceptClassifyFn,  NotifyFn,   FlowDeleteFn},
+
+    //注册TRANSPORT相关的处理。
+    //{&FWPM_LAYER_INBOUND_TRANSPORT_V4,              TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_INBOUND_TRANSPORT_V6,              TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V4,             TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V6,             TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD,      TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_INBOUND_TRANSPORT_V6_DISCARD,      TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD,     TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+    //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD,     TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
+
     //还可以继续添加。
     //...
 
