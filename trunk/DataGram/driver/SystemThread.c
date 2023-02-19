@@ -11,46 +11,40 @@ _IRQL_requires_min_(PASSIVE_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 _Success_(return != 0)
-BYTE* NBLCopyToBuffer(_In_opt_ NET_BUFFER_LIST * pTemplateNBL, _Out_ SIZE_T * pSize)
+BYTE * NBLCopyToBuffer(_In_opt_ NET_BUFFER_LIST * pTemplateNBL, _Out_ SIZE_T * pSize)
 /**
 Purpose:  Copies the NBL to a buffer.
 */
 {
-    BYTE* pBuffer = 0;
+    BYTE * pBuffer = 0;
     UINT32   numBytes = 0;
 
     *pSize = 0;
 
-    if (pTemplateNBL)
-    {
-        for (NET_BUFFER* pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL); pNB; pNB = NET_BUFFER_NEXT_NB(pNB))
-        {
+    if (pTemplateNBL) {
+        for (NET_BUFFER * pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL); pNB; pNB = NET_BUFFER_NEXT_NB(pNB)) {
             numBytes += NET_BUFFER_DATA_LENGTH(pNB);
         }
     }
 
-    if (numBytes)
-    {
-        pBuffer = (BYTE*)ExAllocatePoolWithTag(NonPagedPool, numBytes, TAG);
+    if (numBytes) {
+        pBuffer = (BYTE *)ExAllocatePoolWithTag(NonPagedPool, numBytes, TAG);
         ASSERT(pBuffer);
         RtlZeroMemory(pBuffer, numBytes);
 
-        if (pTemplateNBL)
-        {
-            NET_BUFFER* pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL);
+        if (pTemplateNBL) {
+            NET_BUFFER * pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL);
 
-            for (UINT32 bytesCopied = 0; bytesCopied < numBytes && pNB; pNB = NET_BUFFER_NEXT_NB(pNB))
-            {
-                BYTE* pContiguousBuffer = 0;
+            for (UINT32 bytesCopied = 0; bytesCopied < numBytes && pNB; pNB = NET_BUFFER_NEXT_NB(pNB)) {
+                BYTE * pContiguousBuffer = 0;
                 UINT32 bytesNeeded = NET_BUFFER_DATA_LENGTH(pNB);
 
-                if (bytesNeeded)
-                {
-                    BYTE* pAllocatedBuffer = (BYTE*)ExAllocatePoolWithTag(NonPagedPool, bytesNeeded, TAG);
+                if (bytesNeeded) {
+                    BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePoolWithTag(NonPagedPool, bytesNeeded, TAG);
                     ASSERT(pAllocatedBuffer);
                     RtlZeroMemory(pAllocatedBuffer, bytesNeeded);
 
-                    pContiguousBuffer = (BYTE*)NdisGetDataBuffer(pNB, bytesNeeded, pAllocatedBuffer, 1, 0);
+                    pContiguousBuffer = (BYTE *)NdisGetDataBuffer(pNB, bytesNeeded, pAllocatedBuffer, 1, 0);
 
                     RtlCopyMemory(&(pBuffer[bytesCopied]),
                                   pContiguousBuffer ? pContiguousBuffer : pAllocatedBuffer,
@@ -92,13 +86,11 @@ void FreePendedPacket(_Inout_ __drv_freesMem(Mem) PPENDED_PACKET packet,
                       _Inout_opt_ __drv_freesMem(Mem) WSACMSGHDR * controlData)
 {
     if (packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4] ||
-               packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
+        packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
         FreeUDPPendedPacket(packet, controlData);
     } else {
-        PrintEx(DPFLTR_IHVNETWORK_ID,
-                DPFLTR_WARNING_LEVEL,
-                "¾¯¸æ£ºcalloutId:%d",
-                packet->belongingFlow->calloutId);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
+                "¾¯¸æ£ºcalloutId:%d", packet->belongingFlow->calloutId);
     }
 }
 
@@ -120,8 +112,8 @@ VOID NTAPI UDPInjectComplete(_In_ VOID * Context,
 NTSTATUS UDPInboundInject(_In_ PPENDED_PACKET packet)
 {
     NTSTATUS status = STATUS_SUCCESS;
-    NET_BUFFER_LIST* clonedNetBufferList = NULL;
-    NET_BUFFER* netBuffer;
+    NET_BUFFER_LIST * clonedNetBufferList = NULL;
+    NET_BUFFER * netBuffer;
     ULONG nblOffset;
     NDIS_STATUS ndisStatus;
 
@@ -182,7 +174,7 @@ Exit:
 NTSTATUS UDPOutboundInject(_In_ PPENDED_PACKET packet)
 {
     NTSTATUS status = STATUS_SUCCESS;
-    NET_BUFFER_LIST* clonedNetBufferList = NULL;
+    NET_BUFFER_LIST * clonedNetBufferList = NULL;
     FWPS_TRANSPORT_SEND_PARAMS sendArgs = {0};
 
     status = FwpsAllocateCloneNetBufferList(packet->NetBufferList, NULL, NULL, 0, &clonedNetBufferList);
@@ -193,7 +185,7 @@ NTSTATUS UDPOutboundInject(_In_ PPENDED_PACKET packet)
 
     // Determine whehter we need to proxy the destination address. 
     // If not, we set the remoteAddress to the same address that was initially classified.
-    sendArgs.remoteAddress = ((UINT8*)&packet->remoteAddr);
+    sendArgs.remoteAddress = ((UINT8 *)&packet->remoteAddr);
     sendArgs.remoteScopeId = packet->remoteScopeId;
     sendArgs.controlData = packet->controlData;
     sendArgs.controlDataLength = packet->controlDataLength;
@@ -230,17 +222,15 @@ NTSTATUS inject(PPENDED_PACKET packet)
     NTSTATUS status = STATUS_UNSUCCESSFUL;
 
     if (packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4] ||
-               packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
+        packet->belongingFlow->calloutId == g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]) {
         if (packet->direction == FWP_DIRECTION_OUTBOUND) {
             status = UDPOutboundInject(packet);
         } else {
             status = UDPInboundInject(packet);
         }
     } else {
-        PrintEx(DPFLTR_IHVNETWORK_ID,
-                DPFLTR_ERROR_LEVEL,
-                "´íÎó£ºcalloutId:%#x",
-                packet->belongingFlow->calloutId);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL,
+                "´íÎó£ºcalloutId:%#x", packet->belongingFlow->calloutId);
         //ASSERT(FALSE);
     }
 
@@ -259,8 +249,7 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
     SentToUser->SourceIp.addressFamily = packet->belongingFlow->SourceIp.addressFamily;
 
-    switch (packet->belongingFlow->SourceIp.addressFamily)
-    {
+    switch (packet->belongingFlow->SourceIp.addressFamily) {
     case AF_INET:
         SentToUser->SourceIp.ipv4.S_un.S_addr = packet->belongingFlow->SourceIp.ipv4.S_un.S_addr;
         break;
@@ -276,8 +265,7 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
     SentToUser->DestinationIp.addressFamily = packet->belongingFlow->DestinationIp.addressFamily;
 
-    switch (packet->belongingFlow->DestinationIp.addressFamily)
-    {
+    switch (packet->belongingFlow->DestinationIp.addressFamily) {
     case AF_INET:
         SentToUser->DestinationIp.ipv4.S_un.S_addr = packet->belongingFlow->DestinationIp.ipv4.S_un.S_addr;
         break;
@@ -362,7 +350,7 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
     }
 
     if (packet->DataLength != packet->KernelBufferLength) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, 
+        PrintEx(DPFLTR_IHVNETWORK_ID,
                 DPFLTR_WARNING_LEVEL,
                 "¾¯¸æ£ºÍøÂçÊý¾Ý¿ÉÄÜ¶ªÊ§£¬DataLength£º%d£¬KernelBufferLength£º%d",
                 (int)packet->DataLength,
@@ -398,7 +386,7 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
     status = ZwMapViewOfSection(Section,
                                 Handle,
-                                (PVOID*)&SentToUser->UserBuffer,
+                                (PVOID *)&SentToUser->UserBuffer,
                                 0L,
                                 packet->KernelBufferLength,
                                 NULL,
