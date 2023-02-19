@@ -153,8 +153,10 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
      */
     packet = BuildDataGramPendPacket(pClassifyValues, pMetadata, layerData, flowData);
     if (packet == NULL) {
-        pClassifyOut->actionType = FWP_ACTION_BLOCK;
-        pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+            pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        }
         return;
     }
 

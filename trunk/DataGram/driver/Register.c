@@ -259,10 +259,10 @@ NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
 }
 
 
-VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
-                         _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
-                         UINT16 layerId,
-                         UINT32 calloutId)
+NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
+                             _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
+                             UINT16 layerId,
+                             UINT32 calloutId)
 {
     PFLOW_DATA fc = NULL;
     NTSTATUS status = STATUS_SUCCESS;
@@ -270,11 +270,14 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     PISID sid = NULL;
 
     if (0 != gDriverUnloading) {
-        return;
+        return STATUS_UNSUCCESSFUL;
     }
 
     fc = (PFLOW_DATA)ExAllocatePoolWithTag(NonPagedPool, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext调用成功了不释放。
-    ASSERT(fc);
+    if (!fc) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "%s", "ExAllocatePoolWithTag fail");
+        return STATUS_UNSUCCESSFUL;
+    }
     RtlZeroMemory(fc, sizeof(FLOW_DATA));
 
     PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "跟踪信息：申请上下文:%p", fc);
@@ -380,22 +383,20 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     fc->refCount = 1;
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
-
-    KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
+    //////////////////////////////////////////////////////////////////////////////////////////////    
 
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, 
-                DPFLTR_WARNING_LEVEL, 
-                "错误：status:%#x, CalloutId:%x", 
-                status, 
-                calloutId);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "Error: status:%#x, CalloutId:%x", status, calloutId);
+        ExFreePoolWithTag(fc, TAG);
+        return status;
     }
 
-    InsertTailList(&g_flowContextList, &fc->listEntry);//g_flowContextList被破坏？
-
+    KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
+    InsertTailList(&g_flowContextList, &fc->listEntry);
     KeReleaseInStackQueuedSpinLock(&lockHandle);
+
+    return status;
 }
 
 
@@ -408,6 +409,8 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
                                  _Inout_ FWPS_CLASSIFY_OUT0 * pClassifyOut
 )
 {
+    NTSTATUS status = STATUS_SUCCESS;
+
     UNREFERENCED_PARAMETER(flowContext);
     UNREFERENCED_PARAMETER(pFilter);
     UNREFERENCED_PARAMETER(classifyContext);
@@ -423,7 +426,7 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
     */
     switch (pClassifyValues->layerId) {
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4:
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4, g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4]);
+        status = AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4, g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V4]);
 
         //可继续添加.
 
@@ -436,7 +439,7 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6:
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6, g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]);
+        status = AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6, g_CallOutId[FWPS_LAYER_DATAGRAM_DATA_V6]);
 
         //可继续添加.
 
@@ -451,10 +454,20 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
     default:
         KdBreakPoint();
         break;
-    }
+    }    
 
-    if (pClassifyOut->rights & FWPS_RIGHT_ACTION_WRITE) {
-        pClassifyOut->actionType = FWP_ACTION_CONTINUE;
+    if (!NT_SUCCESS(status)) {
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+    } else {
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        if (pFilter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+            pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        }
+
+        //if (pClassifyOut->rights & FWPS_RIGHT_ACTION_WRITE) {
+        //    pClassifyOut->actionType = FWP_ACTION_CONTINUE;
+        //}  
     }
 }
 

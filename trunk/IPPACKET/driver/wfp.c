@@ -935,6 +935,8 @@ CALLOUT_FILTER g_CalloutFilter[] =
     //{&FWPM_LAYER_OUTBOUND_IPPACKET_V4_DISCARD,     &g_CallOutId.OUTBOUND_IPPACKET_DISCARD_V4, IpPacketClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_OUTBOUND_IPPACKET_V6_DISCARD,     &g_CallOutId.OUTBOUND_IPPACKET_DISCARD_V6, IpPacketClassifyFn,  NotifyFn,   FlowDeleteFn},
 
+    // https://github.com/basil00/Divert.git/ 还处理了FWPM_LAYER_IPFORWARD_V4/6，当然也包含了FWPS_INJECTION_TYPE_FORWARD。
+
     //注册DATAGRAM_DATA相关的处理。
     //{&FWPM_LAYER_DATAGRAM_DATA_V4,             &g_CallOutId.DATAGRAM_DATA_V4,         DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V4_DISCARD,     &g_CallOutId.DATAGRAM_DATA_V4_DISCARD, DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
