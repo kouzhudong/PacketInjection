@@ -457,8 +457,7 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
     }
 
     if (packet->DataLength != packet->KernelBufferLength) {
-        PrintEx(DPFLTR_IHVNETWORK_ID,
-                DPFLTR_WARNING_LEVEL,
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
                 "警告：网络数据可能丢失，DataLength：%d，KernelBufferLength：%d",
                 (int)packet->DataLength,
                 (int)packet->KernelBufferLength);//此时，应以这个为准。
