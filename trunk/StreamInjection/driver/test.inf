@@ -1,0 +1,73 @@
+[Version]
+Signature   = "$Windows NT$"
+Class       = "ContentScreener"                         ;This is determined by the work this filter driver does
+ClassGuid   = {3e3f0674-c83c-4558-bb26-9820e1eba5c5}    ;This value is determined by the Class
+Provider    = %ProviderString%
+DriverVer   = 12/09/2019,1.0.0.0
+CatalogFile = test.cat
+
+
+[DestinationDirs]
+DefaultDestDir       = 12
+test.DriverFiles     = 12            ;%windir%\system32\drivers
+
+
+[DefaultInstall]
+OptionDesc          = %ServiceDescription%
+CopyFiles           = test.DriverFiles
+
+
+[DefaultInstall.Services]
+AddService          = %ServiceName%,,test.Service
+
+
+[DefaultUninstall]
+DelFiles            = test.DriverFiles
+
+
+[DefaultUninstall.Services]
+DelService = test,0x200      ;Ensure service is stopped before deleting
+
+
+[test.Service]
+DisplayName      = %ServiceName%
+Description      = %ServiceDescription%
+ServiceBinary    = %12%\%DriverName%.sys        ;%windir%\system32\drivers\
+Dependencies     = "FltMgr"
+ServiceType      = 2                            ;SERVICE_FILE_SYSTEM_DRIVER
+StartType        = 1                            ;SERVICE_SYSTEM_START
+ErrorControl     = 1                            ;SERVICE_ERROR_NORMAL
+LoadOrderGroup   = "FSFilter Content Screener"
+AddReg           = test.AddRegistry
+
+
+[test.AddRegistry]
+HKR,,"SupportedFeatures",0x00010001,0x3
+HKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%
+HKR,"Instances\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%
+HKR,"Instances\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%
+
+
+[test.DriverFiles]
+%DriverName%.sys
+
+
+[SourceDisksFiles]
+test.sys = 1,,
+
+
+[SourceDisksNames]
+1 = %DiskId1%,,,
+
+
+[Strings]
+ProviderString          = "TODO-Set-Provider"
+ServiceDescription      = "test mini-filter driver"
+ServiceName             = "test"
+DriverName              = "test"
+DiskId1                 = "test Device Installation Disk"
+
+DefaultInstance         = "test Instance"
+Instance1.Name          = "test Instance"
+Instance1.Altitude      = "371100"
+Instance1.Flags         = 0x0          ; Allow all attachments
