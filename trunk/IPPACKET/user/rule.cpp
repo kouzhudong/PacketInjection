@@ -100,12 +100,6 @@ void ResolutionProtocol(PNOTIFICATION notification)
          notification->UserBufferLength,
          notification->UserBufferLength - notification->DataLength
          );
-
-
-
-
-
-
 }
 
 
