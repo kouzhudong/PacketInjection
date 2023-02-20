@@ -349,10 +349,12 @@ the classifyFn0 callout function should ignore this parameter.
         return;// We don't have the necessary right to alter the packet.
     }
 
+    pClassifyOut->actionType = FWP_ACTION_PERMIT;// FWP_ACTION_CONTINUE;
+
     GetFlagsIndexesForLayer(pClassifyValues->layerId, &flagsIndex);
     flags = pClassifyValues->incomingValue[flagsIndex].value.uint32;
 
-    if (FlagOn(flags, FWP_CONDITION_FLAG_IS_FRAGMENT)) {
+    if (FlagOn(flags, FWP_CONDITION_FLAG_IS_FRAGMENT)) {        
         return;
     }
 
@@ -399,8 +401,10 @@ the classifyFn0 callout function should ignore this parameter.
      */
     packet = BuildPendPacket(pClassifyValues, pMetadata, layerData, injectionContext);
     if (packet == NULL) {
-        pClassifyOut->actionType = FWP_ACTION_BLOCK;
-        pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+            pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        }
         return;
     }
 
@@ -584,21 +588,17 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     fc->refCount = 1;
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
-
-    KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
+    //////////////////////////////////////////////////////////////////////////////////////////////    
 
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID,
-                DPFLTR_WARNING_LEVEL,
-                "´íÎó£ºstatus:%#x, CalloutId:%x",
-                status,
-                calloutId);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "´íÎó£ºstatus:%#x, CalloutId:%x", status, calloutId);
+        ExFreePoolWithTag(fc, TAG);
+        return;
     }
 
-    InsertTailList(&g_flowContextList, &fc->listEntry);//g_flowContextList±»ÆÆ»µ£¿
-
+    KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
+    InsertTailList(&g_flowContextList, &fc->listEntry);
     KeReleaseInStackQueuedSpinLock(&lockHandle);
 }
 
@@ -665,9 +665,14 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
         break;
     }
 
-    if (pClassifyOut->rights & FWPS_RIGHT_ACTION_WRITE) {
-        pClassifyOut->actionType = FWP_ACTION_CONTINUE;
+    pClassifyOut->actionType = FWP_ACTION_PERMIT;
+    if (pFilter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+        pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
     }
+
+    //if (pClassifyOut->rights & FWPS_RIGHT_ACTION_WRITE) {
+    //    pClassifyOut->actionType = FWP_ACTION_CONTINUE;
+    //}
 }
 
 
