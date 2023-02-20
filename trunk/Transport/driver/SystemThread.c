@@ -603,7 +603,7 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     控制台的打印字符也挺占用时间和CPU的。
     */
     replyLength = sizeof(REPLY);
-    timeout.QuadPart = -((LONGLONG)10) * (LONGLONG)1000 * (LONGLONG)1000 * 3; // 3s
+    timeout.QuadPart = -((LONGLONG)10) * (LONGLONG)1000 * (LONGLONG)1000 * 1; // 1s
     status = FltSendMessage(g_Data.Filter,
                             &g_Data.ClientPort,
                             SentToUser,
