@@ -50,14 +50,7 @@ VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
     StopWFP();
 
     ThreadNumbers = 1;
-    status = KeWaitForMultipleObjects(ThreadNumbers,
-                                      gThreadObj,
-                                      WaitAll,
-                                      Executive,
-                                      KernelMode,
-                                      FALSE,
-                                      NULL,
-                                      &g_WaitBlockArray[0]);
+    status = KeWaitForMultipleObjects(ThreadNumbers, gThreadObj, WaitAll, Executive, KernelMode, FALSE, NULL, &g_WaitBlockArray[0]);
     switch (status) {
     case STATUS_SUCCESS:
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "–≈œ¢£∫KeWaitForMultipleObjects %s", "STATUS_SUCCESS");

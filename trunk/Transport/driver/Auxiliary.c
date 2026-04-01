@@ -172,9 +172,7 @@ FWP_DIRECTION GetPacketDirectionForLayer(_In_ UINT16 layerId)
 }
 
 
-void GetDeliveryInterfaceIndexesForLayer(_In_ UINT16 layerId,
-                                         _Out_ UINT * interfaceIndexIndex,
-                                         _Out_ UINT * subInterfaceIndexIndex)
+void GetDeliveryInterfaceIndexesForLayer(_In_ UINT16 layerId, _Out_ UINT * interfaceIndexIndex, _Out_ UINT * subInterfaceIndexIndex)
 {
     *interfaceIndexIndex = 0;
     *subInterfaceIndexIndex = 0;
@@ -286,9 +284,7 @@ void GetNetwork5TupleIndexesForLayer(_In_ UINT16 layerId,
 }
 
 
-void FillNetwork5Tuple(_In_ const FWPS_INCOMING_VALUES * inFixedValues,
-                       _In_ ADDRESS_FAMILY addressFamily,
-                       _Inout_ PPENDED_PACKET packet)
+void FillNetwork5Tuple(_In_ const FWPS_INCOMING_VALUES * inFixedValues, _In_ ADDRESS_FAMILY addressFamily, _Inout_ PPENDED_PACKET packet)
 {
     UINT localAddrIndex;
     UINT remoteAddrIndex;
@@ -296,26 +292,15 @@ void FillNetwork5Tuple(_In_ const FWPS_INCOMING_VALUES * inFixedValues,
     UINT remotePortIndex;
     UINT protocolIndex;
 
-    GetNetwork5TupleIndexesForLayer(inFixedValues->layerId,
-                                    &localAddrIndex,
-                                    &remoteAddrIndex,
-                                    &localPortIndex,
-                                    &remotePortIndex,
-                                    &protocolIndex);
+    GetNetwork5TupleIndexesForLayer(inFixedValues->layerId, &localAddrIndex, &remoteAddrIndex, &localPortIndex, &remotePortIndex, &protocolIndex);
 
     if (addressFamily == AF_INET) {
-        packet->ipv4LocalAddr = RtlUlongByteSwap( /* host-order -> network-order conversion */
-                                                 inFixedValues->incomingValue[localAddrIndex].value.uint32);
-        packet->ipv4RemoteAddr = RtlUlongByteSwap( /* host-order -> network-order conversion */
-                                                  inFixedValues->incomingValue[remoteAddrIndex].value.uint32);
+        packet->ipv4LocalAddr = RtlUlongByteSwap( /* host-order -> network-order conversion */inFixedValues->incomingValue[localAddrIndex].value.uint32);
+        packet->ipv4RemoteAddr = RtlUlongByteSwap( /* host-order -> network-order conversion */inFixedValues->incomingValue[remoteAddrIndex].value.uint32);
     } else {
         ASSERT(addressFamily == AF_INET6);
-        RtlCopyMemory((UINT8 *)&packet->localAddr,
-                      inFixedValues->incomingValue[localAddrIndex].value.byteArray16,
-                      sizeof(FWP_BYTE_ARRAY16));
-        RtlCopyMemory((UINT8 *)&packet->remoteAddr,
-                      inFixedValues->incomingValue[remoteAddrIndex].value.byteArray16,
-                      sizeof(FWP_BYTE_ARRAY16));
+        RtlCopyMemory((UINT8 *)&packet->localAddr, inFixedValues->incomingValue[localAddrIndex].value.byteArray16, sizeof(FWP_BYTE_ARRAY16));
+        RtlCopyMemory((UINT8 *)&packet->remoteAddr, inFixedValues->incomingValue[remoteAddrIndex].value.byteArray16, sizeof(FWP_BYTE_ARRAY16));
     }
 
     packet->localPort = RtlUshortByteSwap(inFixedValues->incomingValue[localPortIndex].value.uint16);

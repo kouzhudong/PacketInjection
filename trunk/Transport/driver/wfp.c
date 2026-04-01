@@ -207,7 +207,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 }
 
 
-PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixedValues,
+PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixedValues, 
                                         _In_ const FWPS_INCOMING_METADATA_VALUES * inMetaValues,
                                         _Inout_opt_ void * layerData
 )
@@ -277,9 +277,7 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
 
         if (packet->NetBufferList != NULL) {
             FWPS_PACKET_LIST_INFORMATION packetInfo = {0};
-            FwpsGetPacketListSecurityInformation(packet->NetBufferList,
-                                                 FWPS_PACKET_LIST_INFORMATION_QUERY_IPSEC | FWPS_PACKET_LIST_INFORMATION_QUERY_INBOUND,
-                                                 &packetInfo);
+            FwpsGetPacketListSecurityInformation(packet->NetBufferList, FWPS_PACKET_LIST_INFORMATION_QUERY_IPSEC | FWPS_PACKET_LIST_INFORMATION_QUERY_INBOUND, &packetInfo);
 
             packet->ipSecProtected = (BOOLEAN)packetInfo.ipsecInformation.inbound.isSecure;
             packet->nblOffset = NET_BUFFER_DATA_OFFSET(NET_BUFFER_LIST_FIRST_NB(packet->NetBufferList));
@@ -348,9 +346,7 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
     }
 
     packetState = FwpsQueryPacketInjectionState(g_Transport_InjectionHandle, layerData, NULL);
-    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) ||
-        (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) ||
-        gDriverUnloading) {
+    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) || (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) || gDriverUnloading) {
         pClassifyOut->actionType = FWP_ACTION_PERMIT;
         if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
             pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
@@ -360,11 +356,9 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
     }
 
     packetDirection = GetPacketDirectionForLayer(pClassifyValues->layerId);
-
     if (packetDirection == FWP_DIRECTION_INBOUND) {
         if (IsAleClassifyRequired(pMetadata)) {
-            // Inbound transport packets that are destined to ALE Recv-Accept layers, 
-            // for initial authorization or reauth, should be inspected at the ALE layer.
+            // Inbound transport packets that are destined to ALE Recv-Accept layers, for initial authorization or reauth, should be inspected at the ALE layer.
             // We permit it from Tranport here.
             pClassifyOut->actionType = FWP_ACTION_PERMIT;
             if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
@@ -375,9 +369,7 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
         } else {
             // To be compatible with Vista's IpSec implementation, we must not intercept not-yet-detunneled IpSec traffic.
             FWPS_PACKET_LIST_INFORMATION packetInfo = {0};
-            FwpsGetPacketListSecurityInformation(layerData,
-                                                 FWPS_PACKET_LIST_INFORMATION_QUERY_IPSEC | FWPS_PACKET_LIST_INFORMATION_QUERY_INBOUND,
-                                                 &packetInfo);
+            FwpsGetPacketListSecurityInformation(layerData, FWPS_PACKET_LIST_INFORMATION_QUERY_IPSEC | FWPS_PACKET_LIST_INFORMATION_QUERY_INBOUND, &packetInfo);
             if (packetInfo.ipsecInformation.inbound.isTunnelMode && !packetInfo.ipsecInformation.inbound.isDeTunneled) {
                 pClassifyOut->actionType = FWP_ACTION_PERMIT;
                 if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
@@ -449,9 +441,7 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 }
 
 
-NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
-                  _In_ const GUID * filterKey,
-                  _Inout_ FWPS_FILTER1 * filter)
+NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUID * filterKey, _Inout_ FWPS_FILTER1 * filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -461,10 +451,7 @@ NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
 }
 
 
-VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
-                         _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
-                         UINT16 layerId,
-                         UINT32 calloutId)
+VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata, UINT16 layerId, UINT32 calloutId)
 {
     PFLOW_DATA fc = NULL;
     NTSTATUS status = STATUS_SUCCESS;
@@ -586,8 +573,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                "´íÎó£ºstatus:%#x, CalloutId:%x", status, calloutId);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "´íÎó£ºstatus:%#x, CalloutId:%x", status, calloutId);
         ExFreePoolWithTag(fc, TAG);
         return;
     }
@@ -1043,10 +1029,7 @@ NTSTATUS StartWFP()
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
     } else {
-        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject,
-                                                SubscriptionBFEStateChangeCallback,
-                                                NULL,
-                                                &g_ChangeHandle);
+        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject, SubscriptionBFEStateChangeCallback, NULL, &g_ChangeHandle);
         if (!NT_SUCCESS(NtStatus)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
             return NtStatus;

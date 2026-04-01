@@ -35,7 +35,7 @@ NTSTATUS Unload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 }
 
 
-NTSTATUS InstanceSetup(_In_ PCFLT_RELATED_OBJECTS FltObjects,
+NTSTATUS InstanceSetup(_In_ PCFLT_RELATED_OBJECTS FltObjects, 
                        _In_ FLT_INSTANCE_SETUP_FLAGS Flags,
                        _In_ DEVICE_TYPE VolumeDeviceType,
                        _In_ FLT_FILESYSTEM_TYPE VolumeFilesystemType
@@ -269,9 +269,8 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     OBJECT_ATTRIBUTES oa;
     UNICODE_STRING uniString;
     PSECURITY_DESCRIPTOR sd;
-    NTSTATUS status;
 
-    status = FltRegisterFilter(DriverObject, &FilterRegistration, &g_Data.Filter);
+    NTSTATUS status = FltRegisterFilter(DriverObject, &FilterRegistration, &g_Data.Filter);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
         return status;
@@ -288,14 +287,7 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     } 
 
     InitializeObjectAttributes(&oa, &uniString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, sd);
-    status = FltCreateCommunicationPort(g_Data.Filter,
-                                        &g_Data.ServerPort,
-                                        &oa,
-                                        NULL,
-                                        PortConnect,
-                                        PortDisconnect,
-                                        MessageNotifyCallback,
-                                        1);
+    status = FltCreateCommunicationPort(g_Data.Filter, &g_Data.ServerPort, &oa, NULL, PortConnect, PortDisconnect, MessageNotifyCallback, 1);
     //  Free the security descriptor in all cases.
     //  It is not needed once the call to FltCreateCommunicationPort() is made.    
     if (!NT_SUCCESS(status)) {

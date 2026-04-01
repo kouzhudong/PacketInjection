@@ -51,8 +51,7 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
         message = CONTAINING_RECORD(pOvlp, MESSAGE, Ovlp);
         if (!result) {
             hr = HRESULT_FROM_WIN32(GetLastError());
-            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x",
-                 _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), hr);
+            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), hr);
             break;
         }
 
@@ -65,8 +64,7 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
         replyMessage.Reply.IsBlock = DisposeMessage(&message->Notification);
         hr = FilterReplyMessage(g_port, (PFILTER_REPLY_HEADER)&replyMessage, sizeof(replyMessage));
         if (!SUCCEEDED(hr)) {//ERROR_FLT_NO_WAITER_FOR_REPLY 注意：调试状态下会超时。
-            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x",
-                 _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
+            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
             //break; //不break也不continue，仅仅打印一个信息，对性能和功能无影响。
         }
 
@@ -84,8 +82,7 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
         memset(&message->Ovlp, 0, sizeof(OVERLAPPED));
         hr = FilterGetMessage(g_port, &message->MessageHeader, FIELD_OFFSET(MESSAGE, Ovlp), &message->Ovlp);
         if (hr != HRESULT_FROM_WIN32(ERROR_IO_PENDING)) {
-            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x",
-                 _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), hr);
+            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), hr);
             break;
         }
     }
@@ -96,12 +93,10 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
 
     if (!SUCCEEDED(hr)) {
         if (hr == HRESULT_FROM_WIN32(ERROR_INVALID_HANDLE)) {//port disconncted.     
-            LOGW(IMPORTANT_INFO_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x",
-                 _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
+            LOGW(IMPORTANT_INFO_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
             LOGW(IMPORTANT_INFO_LEVEL, "Port is disconnected, probably due to filter unloading.\n");
         } else {
-            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x",
-                 _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
+            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
         }
     }
 
@@ -158,10 +153,7 @@ void work()
         _ASSERTE(msg != NULL);
 
         memset(&msg->Ovlp, 0, sizeof(OVERLAPPED));
-        hr = FilterGetMessage(g_port,
-                              &msg->MessageHeader,
-                              FIELD_OFFSET(MESSAGE, Ovlp),
-                              &msg->Ovlp);
+        hr = FilterGetMessage(g_port, &msg->MessageHeader, FIELD_OFFSET(MESSAGE, Ovlp), &msg->Ovlp);
         _ASSERTE(hr == HRESULT_FROM_WIN32(ERROR_IO_PENDING));
     }
 
