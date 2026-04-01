@@ -219,7 +219,7 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
 
     ASSERT(layerData);
 
-    packet = ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDED_PACKET), TAG);
+    packet = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(PENDED_PACKET), TAG);
     if (NULL == packet) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "пео╒ё╨%s", "иЙгКдз╢Фй╖╟э");
         return packet;
@@ -253,7 +253,7 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
         if (FWPS_IS_METADATA_FIELD_PRESENT(inMetaValues, FWPS_METADATA_FIELD_TRANSPORT_CONTROL_DATA)) {
             ASSERT(inMetaValues->controlDataLength > 0);
 
-            packet->controlData = ExAllocatePoolWithTag(NonPagedPool, inMetaValues->controlDataLength, TAG);
+            packet->controlData = ExAllocatePool2(POOL_FLAG_NON_PAGED, inMetaValues->controlDataLength, TAG);
             ASSERT(packet->controlData);
             RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
 
@@ -475,7 +475,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         return;
     }
 
-    fc = (PFLOW_DATA)ExAllocatePoolWithTag(NonPagedPool, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext╣ВсцЁи╧╕ак╡╩йм╥е║ё
+    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext╣ВсцЁи╧╕ак╡╩йм╥е║ё
     ASSERT(fc);
     RtlZeroMemory(fc, sizeof(FLOW_DATA));
 
@@ -566,7 +566,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     //////////////////////////////////////////////////////////////////////////////////////////////
     //╤НмБ/╦╗жЗпео╒лНп╢║ё
 
-    fc->processPath = (WCHAR *)ExAllocatePoolWithTag(NonPagedPool, pMetadata->processPath->size, TAG);
+    fc->processPath = (WCHAR *)ExAllocatePool2(POOL_FLAG_NON_PAGED, pMetadata->processPath->size, TAG);
     ASSERT(fc->processPath);
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
@@ -575,7 +575,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
-        fc->sid = (SID *)ExAllocatePoolWithTag(NonPagedPool, fc->sidLen, TAG);
+        fc->sid = (SID *)ExAllocatePool2(POOL_FLAG_NON_PAGED, fc->sidLen, TAG);
         ASSERT(fc->sid);
         memcpy(fc->sid, sid, fc->sidLen);
     }
@@ -807,7 +807,7 @@ FlowDeleteFn тзц╩сппХр╙иообндё╛╩Руъиообндв╒╡Ай╖╟э╣дгИ©Жобё╛©ирт╡╩р╙уБ╦Ж║ёв╗це╧ьа
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
-    FWPS_CALLOUT sCallout = {0};
+    FWPS_CALLOUT1 sCallout = {0};
     FWPM_CALLOUT mCallout = {0};
     FWPM_DISPLAY_DATA displayData = {0};
     FWPM_FILTER filter = {0};
@@ -828,7 +828,7 @@ FlowDeleteFn тзц╩сппХр╙иообндё╛╩Руъиообндв╒╡Ай╖╟э╣дгИ©Жобё╛©ирт╡╩р╙уБ╦Ж║ёв╗це╧ьа
     sCallout.classifyFn = ClassifyFn;
     sCallout.notifyFn = NotifyFn;
     sCallout.flowDeleteFn = FlowDeleteFn;
-    NtStatus = FwpsCalloutRegister(g_deviceObject, &sCallout, MyCalloutId);
+    NtStatus = FwpsCalloutRegister1(g_deviceObject, &sCallout, MyCalloutId);
     if (!NT_SUCCESS(NtStatus)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "╢МнСё╨status:%#x", NtStatus);
         return NtStatus;
