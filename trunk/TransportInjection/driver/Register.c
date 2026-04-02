@@ -249,7 +249,7 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 
 NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, 
                   _In_ const GUID * filterKey,
-                  _Inout_ FWPS_FILTER1 * filter)
+                  _Inout_ FWPS_FILTER3 * filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -273,7 +273,7 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         return STATUS_UNSUCCESSFUL;
     }
 
-    fc = (PFLOW_DATA)ExAllocatePoolWithTag(NonPagedPool, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext调用成功了不释放。
+    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext调用成功了不释放。
     if (!fc) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "%s", "ExAllocatePoolWithTag fail");
         return STATUS_UNSUCCESSFUL;
@@ -367,7 +367,7 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     //////////////////////////////////////////////////////////////////////////////////////////////
     //额外/辅助信息填写。
 
-    fc->processPath = (WCHAR *)ExAllocatePoolWithTag(NonPagedPool, pMetadata->processPath->size, TAG);
+    fc->processPath = (WCHAR *)ExAllocatePool2(POOL_FLAG_NON_PAGED, pMetadata->processPath->size, TAG);
     ASSERT(fc->processPath);
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
@@ -376,7 +376,7 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
-        fc->sid = (SID*)ExAllocatePoolWithTag(NonPagedPool, fc->sidLen, TAG);
+        fc->sid = (SID*)ExAllocatePool2(POOL_FLAG_NON_PAGED, fc->sidLen, TAG);
         ASSERT(fc->sid);
         memcpy(fc->sid, sid, fc->sidLen);
     }
@@ -404,7 +404,7 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
                                  _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
                                  _Inout_opt_ void * layerData,
                                  _In_opt_ const void * classifyContext,
-                                 _In_ const FWPS_FILTER1 * pFilter,
+                                 _In_ const FWPS_FILTER3 * pFilter,
                                  _In_ UINT64 flowContext,
                                  _Inout_ FWPS_CLASSIFY_OUT0 * pClassifyOut
 )
@@ -592,8 +592,8 @@ void StopWFP()
 
 NTSTATUS RegisterCallout(__in GUID SystemlayerKey,
                          __out PUINT32 MyCalloutId,
-                         __in FWPS_CALLOUT_CLASSIFY_FN1 ClassifyFn,
-                         __in FWPS_CALLOUT_NOTIFY_FN1 NotifyFn,
+                         __in FWPS_CALLOUT_CLASSIFY_FN ClassifyFn,
+                         __in FWPS_CALLOUT_NOTIFY_FN NotifyFn,
                          __in_opt FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0 FlowDeleteFn
 )
 /*

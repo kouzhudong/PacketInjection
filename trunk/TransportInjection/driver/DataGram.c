@@ -16,7 +16,7 @@ PPENDED_PACKET BuildDataGramPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixed
         return packet;
     }
 
-    packet = ExAllocatePoolWithTag(NonPagedPool, sizeof(PENDED_PACKET), TAG);
+    packet = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(PENDED_PACKET), TAG);
     if (NULL == packet) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "ÐÅÏ¢£º%s", "ÉêÇëÄÚ´æÊ§°Ü");
         return packet;
@@ -58,7 +58,7 @@ PPENDED_PACKET BuildDataGramPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixed
         if (FWPS_IS_METADATA_FIELD_PRESENT(inMetaValues, FWPS_METADATA_FIELD_TRANSPORT_CONTROL_DATA)) {
             ASSERT(inMetaValues->controlDataLength > 0);
 
-            packet->controlData = ExAllocatePoolWithTag(NonPagedPool, inMetaValues->controlDataLength, TAG);
+            packet->controlData = ExAllocatePool2(POOL_FLAG_NON_PAGED, inMetaValues->controlDataLength, TAG);
             ASSERT(packet->controlData);
             RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
 
@@ -98,7 +98,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
                               _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
                               _Inout_opt_ void * layerData,
                               _In_opt_ const void * classifyContext,
-                              _In_ const FWPS_FILTER1 * filter,
+                              _In_ const FWPS_FILTER3 * filter,
                               _In_ UINT64 flowContext,
                               _Inout_ FWPS_CLASSIFY_OUT0 * pClassifyOut
 )
