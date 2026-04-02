@@ -309,7 +309,7 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
         fc->DestinationIp.addressFamily = AF_INET;
 
-        fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+        fc->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
 
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
 
@@ -335,7 +335,7 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         fc->SourceIp.addressFamily = AF_INET6;
         //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
 
-        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
+        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
         fc->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_PORT].value.uint16;
@@ -366,7 +366,10 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     //额外/辅助信息填写。
 
     fc->processPath = (WCHAR *)ExAllocatePool2(POOL_FLAG_NON_PAGED, pMetadata->processPath->size, TAG);
-    ASSERT(fc->processPath);
+    if (fc->processPath == NULL) {
+        ExFreePoolWithTag(fc, TAG);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
 
@@ -375,7 +378,11 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
         fc->sid = (SID*)ExAllocatePool2(POOL_FLAG_NON_PAGED, fc->sidLen, TAG);
-        ASSERT(fc->sid);
+        if (fc->sid == NULL) {
+            ExFreePoolWithTag(fc->processPath, TAG);
+            ExFreePoolWithTag(fc, TAG);
+            return STATUS_INSUFFICIENT_RESOURCES;
+        }
         memcpy(fc->sid, sid, fc->sidLen);
     }
 
@@ -386,6 +393,8 @@ NTSTATUS AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "Error: status:%#x, CalloutId:%x", status, calloutId);
+        ExFreePoolWithTag(fc->sid, TAG);
+        ExFreePoolWithTag(fc->processPath, TAG);
         ExFreePoolWithTag(fc, TAG);
         return status;
     }
@@ -571,10 +580,17 @@ void StopWFP()
     InterlockedIncrement(&gDriverUnloading);
     KeReleaseInStackQueuedSpinLock(&flowListLockHandle);
 
-    status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
-    ASSERT(NT_SUCCESS(status));
-    status = FwpmEngineClose(g_EngineHandle);
-    ASSERT(NT_SUCCESS(status));
+    if (g_ChangeHandle != NULL) {
+        status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_ChangeHandle = NULL;
+    }
+
+    if (g_EngineHandle != NULL) {
+        status = FwpmEngineClose(g_EngineHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_EngineHandle = NULL;
+    }
 
     RemoveFlows();
 
@@ -907,6 +923,12 @@ NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
         }
 
         UINT8 id = HlprFwpmLayerGetIDByKey(Registration[i].SystemlayerKey);
+        if (id >= FWPS_BUILTIN_LAYER_MAX) {
+            NtStatus = STATUS_INVALID_PARAMETER;
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "i:%d, invalid layer key", i);
+            break;
+        }
+
         PUINT32 CalloutId = &g_CallOutId[id];
 
         NtStatus = RegisterCallout(*Registration[i].SystemlayerKey,
