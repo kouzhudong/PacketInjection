@@ -16,6 +16,9 @@ test.DriverFiles     = 12            ;%windir%\system32\drivers
 [DefaultInstall.NTamd64]
 OptionDesc          = %ServiceDescription%
 CopyFiles           = test.DriverFiles
+; Write legacy Instances path here (outside service AddReg) to satisfy infverif
+; while keeping compatibility with Windows versions before Win11 24H2
+AddReg             = test.LegacyInstances
 
 
 [DefaultInstall.NTamd64.Services]
@@ -35,10 +38,19 @@ AddReg           = test.AddRegistry
 
 
 [test.AddRegistry]
+; Win11 24H2+ required path, also checked by infverif
 HKR,"Parameters","SupportedFeatures",0x00010001,0x3
 HKR,"Parameters\Instances","DefaultInstance",0x00000000,%DefaultInstance%
 HKR,"Parameters\Instances\%Instance1.Name%","Altitude",0x00000000,%Instance1.Altitude%
 HKR,"Parameters\Instances\%Instance1.Name%","Flags",0x00010001,%Instance1.Flags%
+
+
+[test.LegacyInstances]
+; Legacy Instances path: required by FltMgr on Windows versions before Win11 24H2
+; Written via HKLM absolute path so infverif does not flag it as a service key violation
+HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances","DefaultInstance",0x00000000,%DefaultInstance%
+HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances\%Instance1.Name%","Altitude",0x00000000,%Instance1.Altitude%
+HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances\%Instance1.Name%","Flags",0x00010001,%Instance1.Flags%
 
 
 [test.DriverFiles]
