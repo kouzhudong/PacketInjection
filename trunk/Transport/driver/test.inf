@@ -1,7 +1,7 @@
 [Version]
 Signature   = "$Windows NT$"
-Class       = "ContentScreener"                         ;This is determined by the work this filter driver does
-ClassGuid   = {3e3f0674-c83c-4558-bb26-9820e1eba5c5}    ;This value is determined by the Class
+Class       = "ContentScreener"                         ;由驱动的工作类型决定
+ClassGuid   = {3e3f0674-c83c-4558-bb26-9820e1eba5c5}    ;由Class决定
 Provider    = %ProviderString%
 DriverVer   = 12/09/2019,1.0.0.0
 CatalogFile = test.cat
@@ -16,8 +16,8 @@ test.DriverFiles     = 12            ;%windir%\system32\drivers
 [DefaultInstall.NTamd64]
 OptionDesc          = %ServiceDescription%
 CopyFiles           = test.DriverFiles
-; Write legacy Instances path here (outside service AddReg) to satisfy infverif
-; while keeping compatibility with Windows versions before Win11 24H2
+; 在此写入旧版Instances路径（在服务AddReg之外），以通过infverif校验
+; 同时兼容Win11 24H2之前的Windows版本
 AddReg             = test.LegacyInstances
 
 
@@ -38,7 +38,7 @@ AddReg           = test.AddRegistry
 
 
 [test.AddRegistry]
-; Win11 24H2+ required path, also checked by infverif
+; Win11 24H2+要求的路径，同时也是infverif的检查路径
 HKR,"Parameters","SupportedFeatures",0x00010001,0x3
 HKR,"Parameters\Instances","DefaultInstance",0x00000000,%DefaultInstance%
 HKR,"Parameters\Instances\%Instance1.Name%","Altitude",0x00000000,%Instance1.Altitude%
@@ -46,8 +46,8 @@ HKR,"Parameters\Instances\%Instance1.Name%","Flags",0x00010001,%Instance1.Flags%
 
 
 [test.LegacyInstances]
-; Legacy Instances path: required by FltMgr on Windows versions before Win11 24H2
-; Written via HKLM absolute path so infverif does not flag it as a service key violation
+; 旧版Instances路径：Win11 24H2之前的Windows版本，FltMgr从此路径读取实例配置
+; 使用HKLM绝对路径写入，避免infverif将其识别为服务注册表键违规
 HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances","DefaultInstance",0x00000000,%DefaultInstance%
 HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances\%Instance1.Name%","Altitude",0x00000000,%Instance1.Altitude%
 HKLM,"System\CurrentControlSet\Services\%ServiceName%\Instances\%Instance1.Name%","Flags",0x00010001,%Instance1.Flags%
@@ -75,4 +75,4 @@ DiskId1                 = "test Device Installation Disk"
 DefaultInstance         = "test Instance"
 Instance1.Name          = "test Instance"
 Instance1.Altitude      = "371100"
-Instance1.Flags         = 0x0          ; Allow all attachments
+Instance1.Flags         = 0x0          ; 允许所有附加
