@@ -53,7 +53,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow.SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
-        packet->belongingFlow.SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_LOCAL_PORT].value.uint16;
+        packet->belongingFlow.SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_PORT].value.uint16;
 
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_REMOTE_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow.DestinationIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
@@ -497,7 +497,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
 
         fc->DestinationIp.addressFamily = AF_INET;
 
-        fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+        fc->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
 
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
 
@@ -523,7 +523,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
         fc->SourceIp.addressFamily = AF_INET6;
         //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
 
-        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
+        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
         fc->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_PORT].value.uint16;
