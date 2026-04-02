@@ -135,9 +135,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     }
 
     packetState = FwpsQueryPacketInjectionState(g_Transport_InjectionHandle, layerData, NULL);
-    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) ||
-        (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) ||
-        gDriverUnloading) {
+    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) || (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) || gDriverUnloading) {
         pClassifyOut->actionType = FWP_ACTION_PERMIT;
         if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
             pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;

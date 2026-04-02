@@ -127,7 +127,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES* pClassifyValues, OUT PPENDED_PAC
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
-        packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_LOCAL_PORT].value.uint16;
+        packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_PORT].value.uint16;
 
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_REMOTE_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow->DestinationIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
@@ -247,9 +247,7 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 }
 
 
-NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, 
-                  _In_ const GUID * filterKey,
-                  _Inout_ FWPS_FILTER3 * filter)
+NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUID * filterKey, _Inout_ FWPS_FILTER3 * filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -514,8 +512,7 @@ void UnregisterAllCalloutId()
         if (g_CallOutId[i]) {
             NtStatus = FwpsCalloutUnregisterById(g_CallOutId[i]);
             if (!NT_SUCCESS(NtStatus)) {
-                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                        "i:%d, id:%#x, NtStatus:%#x", i, g_CallOutId[i], NtStatus);
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "i:%d, id:%#x, NtStatus:%#x", i, g_CallOutId[i], NtStatus);
             }
 
             /*
@@ -714,260 +711,178 @@ _Success_(return < FWPS_BUILTIN_LAYER_MAX)
 
     UINT8 layerID = FWPS_BUILTIN_LAYER_MAX;
 
-    if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V4,
-                          pLayerKey))
+    if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V4, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_IPPACKET_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_IPPACKET_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V6, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_IPPACKET_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_IPPACKET_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_IPPACKET_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V4, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_IPPACKET_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_IPPACKET_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V6, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_IPPACKET_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_IPPACKET_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_IPPACKET_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V4, pLayerKey))
         layerID = FWPS_LAYER_IPFORWARD_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_IPFORWARD_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V6, pLayerKey))
         layerID = FWPS_LAYER_IPFORWARD_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_IPFORWARD_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_IPFORWARD_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V4, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_TRANSPORT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_TRANSPORT_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V6, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_TRANSPORT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_TRANSPORT_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V4, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_TRANSPORT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V6, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_TRANSPORT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V4, pLayerKey))
         layerID = FWPS_LAYER_STREAM_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_STREAM_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V6, pLayerKey))
         layerID = FWPS_LAYER_STREAM_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_STREAM_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V4, pLayerKey))
         layerID = FWPS_LAYER_DATAGRAM_DATA_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_DATAGRAM_DATA_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V6, pLayerKey))
         layerID = FWPS_LAYER_DATAGRAM_DATA_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_DATAGRAM_DATA_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_DATAGRAM_DATA_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V4, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_ICMP_ERROR_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_ICMP_ERROR_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V6, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_ICMP_ERROR_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_ICMP_ERROR_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_ICMP_ERROR_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_ICMP_ERROR_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_ICMP_ERROR_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V6, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_ICMP_ERROR_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_ICMP_ERROR_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_ICMP_ERROR_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_ASSIGNMENT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_ASSIGNMENT_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_ASSIGNMENT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_ASSIGNMENT_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_ASSIGNMENT_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_LISTEN_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_LISTEN_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_LISTEN_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_LISTEN_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_LISTEN_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_RECV_ACCEPT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_RECV_ACCEPT_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_RECV_ACCEPT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_RECV_ACCEPT_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_CONNECT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_CONNECT_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_CONNECT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_AUTH_CONNECT_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_AUTH_CONNECT_V6_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD, pLayerKey))
         layerID = FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD;
 
 #if(NTDDI_VERSION >= NTDDI_WIN7)
 
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_NAME_RESOLUTION_CACHE_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_NAME_RESOLUTION_CACHE_V4, pLayerKey))
         layerID = FWPS_LAYER_NAME_RESOLUTION_CACHE_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_NAME_RESOLUTION_CACHE_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_NAME_RESOLUTION_CACHE_V6, pLayerKey))
         layerID = FWPS_LAYER_NAME_RESOLUTION_CACHE_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_RELEASE_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_RELEASE_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_RELEASE_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_RELEASE_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_RESOURCE_RELEASE_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_RESOURCE_RELEASE_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_ENDPOINT_CLOSURE_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_ENDPOINT_CLOSURE_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_ENDPOINT_CLOSURE_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_ENDPOINT_CLOSURE_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_ENDPOINT_CLOSURE_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_ENDPOINT_CLOSURE_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_CONNECT_REDIRECT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_CONNECT_REDIRECT_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_CONNECT_REDIRECT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_CONNECT_REDIRECT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_CONNECT_REDIRECT_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_CONNECT_REDIRECT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_BIND_REDIRECT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_BIND_REDIRECT_V4, pLayerKey))
         layerID = FWPS_LAYER_ALE_BIND_REDIRECT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_BIND_REDIRECT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_ALE_BIND_REDIRECT_V6, pLayerKey))
         layerID = FWPS_LAYER_ALE_BIND_REDIRECT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_PACKET_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_PACKET_V4, pLayerKey))
         layerID = FWPS_LAYER_STREAM_PACKET_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_PACKET_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_STREAM_PACKET_V6, pLayerKey))
         layerID = FWPS_LAYER_STREAM_PACKET_V6;
 
 #if(NTDDI_VERSION >= NTDDI_WIN8)
 
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_ETHERNET,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_ETHERNET, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_MAC_FRAME_ETHERNET;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_ETHERNET,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_ETHERNET, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_MAC_FRAME_ETHERNET;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_NATIVE,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_NATIVE, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_MAC_FRAME_NATIVE;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_NATIVE,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_NATIVE, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_MAC_FRAME_NATIVE;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_ETHERNET,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_ETHERNET, pLayerKey))
         layerID = FWPS_LAYER_INGRESS_VSWITCH_ETHERNET;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_ETHERNET,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_ETHERNET, pLayerKey))
         layerID = FWPS_LAYER_EGRESS_VSWITCH_ETHERNET;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_TRANSPORT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_TRANSPORT_V4, pLayerKey))
         layerID = FWPS_LAYER_INGRESS_VSWITCH_TRANSPORT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_TRANSPORT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INGRESS_VSWITCH_TRANSPORT_V6, pLayerKey))
         layerID = FWPS_LAYER_INGRESS_VSWITCH_TRANSPORT_V6;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_TRANSPORT_V4,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_TRANSPORT_V4, pLayerKey))
         layerID = FWPS_LAYER_EGRESS_VSWITCH_TRANSPORT_V4;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_TRANSPORT_V6,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_EGRESS_VSWITCH_TRANSPORT_V6, pLayerKey))
         layerID = FWPS_LAYER_EGRESS_VSWITCH_TRANSPORT_V6;
 
 #if(NTDDI_VERSION >= NTDDI_WINBLUE)
 
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_FAST,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_TRANSPORT_FAST, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_TRANSPORT_FAST;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_FAST,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_TRANSPORT_FAST, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_TRANSPORT_FAST;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_NATIVE_FAST,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_INBOUND_MAC_FRAME_NATIVE_FAST, pLayerKey))
         layerID = FWPS_LAYER_INBOUND_MAC_FRAME_NATIVE_FAST;
-    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_NATIVE_FAST,
-                               pLayerKey))
+    else if (HlprGUIDsAreEqual(&FWPM_LAYER_OUTBOUND_MAC_FRAME_NATIVE_FAST, pLayerKey))
         layerID = FWPS_LAYER_OUTBOUND_MAC_FRAME_NATIVE_FAST;
 
 #endif // (NTDDI_VERSION >= NTDDI_WINBLUE)
@@ -1179,10 +1094,7 @@ NTSTATUS StartWFP()
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
     } else {
-        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject,
-                                                SubscriptionBFEStateChangeCallback,
-                                                NULL,
-                                                &g_ChangeHandle);
+        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject, SubscriptionBFEStateChangeCallback, NULL, &g_ChangeHandle);
         if (!NT_SUCCESS(NtStatus)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
             return NtStatus;
