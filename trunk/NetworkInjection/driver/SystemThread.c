@@ -42,7 +42,6 @@ Purpose:  Copies the NBL to a buffer.
             for (UINT32 bytesCopied = 0; bytesCopied < numBytes && pNB; pNB = NET_BUFFER_NEXT_NB(pNB)) {
                 BYTE * pContiguousBuffer = 0;
                 UINT32 bytesNeeded = NET_BUFFER_DATA_LENGTH(pNB);
-
                 if (bytesNeeded) {
                     BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePoolZero(NonPagedPool, bytesNeeded, TAG);
                     ASSERT(pAllocatedBuffer);
@@ -50,9 +49,7 @@ Purpose:  Copies the NBL to a buffer.
 
                     pContiguousBuffer = (BYTE *)NdisGetDataBuffer(pNB, bytesNeeded, pAllocatedBuffer, 1, 0);
 
-                    RtlCopyMemory(&(pBuffer[bytesCopied]),
-                                  pContiguousBuffer ? pContiguousBuffer : pAllocatedBuffer,
-                                  bytesNeeded);
+                    RtlCopyMemory(&(pBuffer[bytesCopied]), pContiguousBuffer ? pContiguousBuffer : pAllocatedBuffer, bytesNeeded);
 
                     bytesCopied += bytesNeeded;
 
@@ -88,9 +85,7 @@ void FreePendedPacket(_Inout_ __drv_freesMem(Mem) PPENDED_PACKET packet)
 }
 
 
-VOID NTAPI InjectComplete(_In_ VOID * Context,
-                          _Inout_ NET_BUFFER_LIST * NetBufferList,
-                          _In_ BOOLEAN DispatchLevel)
+VOID NTAPI InjectComplete(_In_ VOID * Context, _Inout_ NET_BUFFER_LIST * NetBufferList, _In_ BOOLEAN DispatchLevel)
 {
     PPENDED_PACKET packet = Context;
 
@@ -146,13 +141,7 @@ NTSTATUS OutboundInject(_In_ PPENDED_PACKET packet)
         return status;
     }
 
-    status = FwpsInjectNetworkSendAsync(InjectionHandle,
-                                        packet->injectionContext,
-                                        0,
-                                        packet->compartmentId,
-                                        clonedNetBufferList,
-                                        InjectComplete,
-                                        0);
+    status = FwpsInjectNetworkSendAsync(InjectionHandle, packet->injectionContext, 0, packet->compartmentId, clonedNetBufferList, InjectComplete, 0);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
         FwpsFreeCloneNetBufferList(clonedNetBufferList, 0);
@@ -436,13 +425,7 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
 
     replyLength = sizeof(REPLY);
     timeout.QuadPart = -((LONGLONG)10) * (LONGLONG)1000 * (LONGLONG)1000 * 1; // 1s
-    status = FltSendMessage(g_Data.Filter,
-                            &g_Data.ClientPort,
-                            SentToUser,
-                            sizeof(NOTIFICATION),
-                            SentToUser,
-                            &replyLength,
-                            &timeout);
+    status = FltSendMessage(g_Data.Filter, &g_Data.ClientPort, SentToUser, sizeof(NOTIFICATION), SentToUser, &replyLength, &timeout);
     switch (status) {
     case STATUS_SUCCESS:
         IsBlock = ((PREPLY)SentToUser)->IsBlock;

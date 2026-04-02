@@ -15,6 +15,7 @@ LONG gDriverUnloading = FALSE;//为TRUE时就不再接受各个消息了
 PDEVICE_OBJECT g_deviceObject;
 
 void * gThreadObj[MAXIMUM_WAIT_OBJECTS];
+CHAR gThreadCount;
 
 KWAIT_BLOCK g_WaitBlockArray[MAXIMUM_WAIT_OBJECTS];//The WaitBlockArray buffer must reside in nonpaged system memory. 
 
@@ -36,7 +37,7 @@ VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
 */
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    char ThreadNumbers = min(KeNumberProcessors, MAXIMUM_WAIT_OBJECTS);
+    CHAR threadNumbers = gThreadCount;
 
     PAGED_CODE();
 
@@ -48,37 +49,35 @@ VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
 
     StopWFP();
 
-    status = KeWaitForMultipleObjects(ThreadNumbers,
-                                      gThreadObj,
-                                      WaitAll,
-                                      Executive,
-                                      KernelMode,
-                                      FALSE,
-                                      NULL,
-                                      &g_WaitBlockArray[0]);
-    switch (status) {
-    case STATUS_SUCCESS:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "info: KeWaitForMultipleObjects %s", "STATUS_SUCCESS");
-        break;
-    case STATUS_ALERTED:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_ALERTED");
-        break;
-    case STATUS_USER_APC:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_USER_APC");
-        break;
-    case STATUS_TIMEOUT:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_TIMEOUT");
-        break;
-    default:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "error: status:%#x", status);
-        break;
-    }
-
-    for (CCHAR i = 0; i < ThreadNumbers; i++) {
-        if (NULL != gThreadObj[i]) {
-            ObDereferenceObject(gThreadObj[i]);
+    if (threadNumbers > 0) {
+        status = KeWaitForMultipleObjects(threadNumbers, gThreadObj, WaitAll, Executive, KernelMode, FALSE, NULL, &g_WaitBlockArray[0]);
+        switch (status) {
+        case STATUS_SUCCESS:
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "info: KeWaitForMultipleObjects %s", "STATUS_SUCCESS");
+            break;
+        case STATUS_ALERTED:
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_ALERTED");
+            break;
+        case STATUS_USER_APC:
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_USER_APC");
+            break;
+        case STATUS_TIMEOUT:
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "warning: KeWaitForMultipleObjects  %s", "STATUS_TIMEOUT");
+            break;
+        default:
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "error: status:%#x", status);
+            break;
         }
     }
+
+    for (CCHAR i = 0; i < threadNumbers; i++) {
+        if (NULL != gThreadObj[i]) {
+            ObDereferenceObject(gThreadObj[i]);
+            gThreadObj[i] = NULL;
+        }
+    }
+
+    gThreadCount = 0;
 
     IoDeleteSymbolicLink(&g_SymbolicLinkName);
     IoDeleteDevice(g_deviceObject);
@@ -95,6 +94,7 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     HANDLE threadHandle = NULL;    
+    CHAR threadNumbers = 1;// min(KeNumberProcessors, MAXIMUM_WAIT_OBJECTS);
 
     UNREFERENCED_PARAMETER(pRegistryPath);
 
@@ -105,6 +105,8 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
     PAGED_CODE();
 
     ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
+
+    gThreadCount = 0;
 
     InitializeListHead(&g_PacketList);
     KeInitializeSpinLock(&g_PacketListLock);
@@ -143,13 +145,13 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
             __leave;
         }
 
-        char ThreadNumbers = 1;// min(KeNumberProcessors, MAXIMUM_WAIT_OBJECTS);
-        for (CCHAR i = 0; i < ThreadNumbers; i++) {
+        for (CCHAR i = 0; i < threadNumbers; i++) {
             status = PsCreateSystemThread(&threadHandle, THREAD_ALL_ACCESS, NULL, NULL, NULL, WorkThread, NULL);
             ASSERT(NT_SUCCESS(status));
             status = ObReferenceObjectByHandle(threadHandle, 0, NULL, KernelMode, &gThreadObj[i], NULL);
             ASSERT(NT_SUCCESS(status));
             ZwClose(threadHandle);
+            gThreadCount++;
         }
     } __finally {
         if (!NT_SUCCESS(status)) {

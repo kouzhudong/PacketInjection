@@ -288,14 +288,7 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     } 
 
     InitializeObjectAttributes(&oa, &uniString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, sd);
-    status = FltCreateCommunicationPort(g_Data.Filter,
-                                        &g_Data.ServerPort,
-                                        &oa,
-                                        NULL,
-                                        PortConnect,
-                                        PortDisconnect,
-                                        MessageNotifyCallback,
-                                        1);
+    status = FltCreateCommunicationPort(g_Data.Filter, &g_Data.ServerPort, &oa, NULL, PortConnect, PortDisconnect, MessageNotifyCallback, 1);
     //  Free the security descriptor in all cases.
     //  It is not needed once the call to FltCreateCommunicationPort() is made.    
     if (!NT_SUCCESS(status)) {

@@ -72,8 +72,7 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
     SYSTEMTIME st;
     GetLocalTime(&st);
     wchar_t time[MAX_PATH] = {0};//∏Ò Ω£∫2016-07-11 17:35:54 
-    int written = wsprintfW(time, L"%04d-%02d-%02d %02d:%02d:%02d:%03d\t",
-                            st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+    int written = wsprintfW(time, L"%04d-%02d-%02d %02d:%02d:%02d:%03d\t", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
     written = printf("%ls", time);
 

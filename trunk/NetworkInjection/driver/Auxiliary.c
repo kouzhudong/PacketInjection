@@ -194,9 +194,7 @@ FWP_DIRECTION GetPacketDirectionForLayer(_In_ UINT16 layerId)
 }
 
 
-void GetDeliveryInterfaceIndexesForLayer(_In_ UINT16 layerId,
-                                         _Out_ UINT * interfaceIndexIndex,
-                                         _Out_ UINT * subInterfaceIndexIndex)
+void GetDeliveryInterfaceIndexesForLayer(_In_ UINT16 layerId, _Out_ UINT * interfaceIndexIndex, _Out_ UINT * subInterfaceIndexIndex)
 {
     *interfaceIndexIndex = 0;
     *subInterfaceIndexIndex = 0;

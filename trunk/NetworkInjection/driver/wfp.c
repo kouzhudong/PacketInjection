@@ -1079,10 +1079,7 @@ NTSTATUS StartWFP()
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
     } else {
-        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject,
-                                                SubscriptionBFEStateChangeCallback,
-                                                NULL,
-                                                &g_ChangeHandle);
+        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject, SubscriptionBFEStateChangeCallback, NULL, &g_ChangeHandle);
         if (!NT_SUCCESS(NtStatus)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
             return NtStatus;
