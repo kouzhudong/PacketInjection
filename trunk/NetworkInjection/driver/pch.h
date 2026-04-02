@@ -28,6 +28,7 @@ extern "C" {
 #define NDIS_SUPPORT_NDIS6 1
 #endif 
 
+#define POOL_ZERO_DOWN_LEVEL_SUPPORT
 #define POOL_NX_OPTIN 1
 
 #pragma warning(disable:4200) // 使用了非标准扩展 : 结构/联合中的零大小数组
@@ -36,6 +37,7 @@ extern "C" {
 #pragma warning(disable:4127) // 条件表达式是常量
 #pragma warning(disable:4057) // 在稍微不同的基类型间接寻址上不同
 #pragma warning(disable:4152) // 非标准扩展，表达式中的函数/数据指针转换
+#pragma warning(disable:4996) // deprecated WDK allocation wrappers on down-level targets
 #pragma warning(disable:28172) //The function 'XXX' has PAGED_CODE or PAGED_CODE_LOCKED but is not declared to be in a paged segment. 原因：1.函数内IRQL升级，2.函数内的函数的参数用局部变量，且要求这个变量是非分页内存。
 
 #include <ntifs.h>

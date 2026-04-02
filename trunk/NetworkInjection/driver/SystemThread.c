@@ -32,7 +32,7 @@ Purpose:  Copies the NBL to a buffer.
     }
 
     if (numBytes) {
-        pBuffer = (BYTE *)ExAllocatePoolWithTag(NonPagedPool, numBytes, TAG);
+        pBuffer = (BYTE *)ExAllocatePoolZero(NonPagedPool, numBytes, TAG);
         ASSERT(pBuffer);
         RtlZeroMemory(pBuffer, numBytes);
 
@@ -44,7 +44,7 @@ Purpose:  Copies the NBL to a buffer.
                 UINT32 bytesNeeded = NET_BUFFER_DATA_LENGTH(pNB);
 
                 if (bytesNeeded) {
-                    BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePoolWithTag(NonPagedPool, bytesNeeded, TAG);
+                    BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePoolZero(NonPagedPool, bytesNeeded, TAG);
                     ASSERT(pAllocatedBuffer);
                     RtlZeroMemory(pAllocatedBuffer, bytesNeeded);
 
@@ -425,7 +425,7 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     //////////////////////////////////////////////////////////////////////////////////////////////
     //填写返回给应用层的信息。
 
-    SentToUser = ExAllocatePoolWithTag(PagedPool, sizeof(NOTIFICATION), TAG);
+    SentToUser = ExAllocatePoolZero(PagedPool, sizeof(NOTIFICATION), TAG);
     ASSERT(SentToUser);
     RtlZeroMemory(SentToUser, sizeof(NOTIFICATION));
 
