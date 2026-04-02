@@ -53,11 +53,11 @@ ULONG g_log_level = DEFAULT_LOG_LEVEL;//日志开关，由配置文件控制。
 
 void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
 {
-    if (!BitTest((const LONG*)&g_log_level, Level)) {
+    if (Level < ERROR_LEVEL || Level > MAX_LEVEL) {
         return;
     }
 
-    if (Level >= MAX_LEVEL) {
+    if (!BitTest((const LONG*)&g_log_level, Level)) {
         return;
     }
 
@@ -76,7 +76,7 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
 
     written = printf("%ls", time);
 
-    written = printf("%ls", g_log_level_w[Level]);
+    written = printf("%ls", g_log_level_w[static_cast<size_t>(Level)]);
 
     written = vprintf(Format, args);
 
