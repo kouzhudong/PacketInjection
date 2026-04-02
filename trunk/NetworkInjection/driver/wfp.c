@@ -482,8 +482,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
     }
 
     fc = (PFLOW_DATA)ExAllocatePoolZero(NonPagedPool, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext调用成功了不释放。
-    ASSERT(fc);
-    RtlZeroMemory(fc, sizeof(FLOW_DATA));
+    if (fc == NULL) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：%s", "申请上下文内存失败");
+        return;
+    }
 
     //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "跟踪信息：申请上下文:%p", fc);
 
@@ -516,7 +518,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
 
         fc->DestinationIp.addressFamily = AF_INET;
 
-        fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+        fc->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
 
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
 
@@ -542,7 +544,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
         fc->SourceIp.addressFamily = AF_INET6;
         //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
 
-        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
+        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
         fc->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_PORT].value.uint16;
@@ -573,7 +575,11 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
     //额外/辅助信息填写。
 
     fc->processPath = (WCHAR *)ExAllocatePoolZero(NonPagedPool, pMetadata->processPath->size, TAG);
-    ASSERT(fc->processPath);
+    if (fc->processPath == NULL) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：%s", "申请进程路径内存失败");
+        ExFreePoolWithTag(fc, TAG);
+        return;
+    }
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
 
@@ -582,7 +588,12 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
         fc->sid = (SID *)ExAllocatePoolZero(NonPagedPool, fc->sidLen, TAG);
-        ASSERT(fc->sid);
+        if (fc->sid == NULL) {
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：%s", "申请SID内存失败");
+            ExFreePoolWithTag(fc->processPath, TAG);
+            ExFreePoolWithTag(fc, TAG);
+            return;
+        }
         memcpy(fc->sid, sid, fc->sidLen);
     }
 
@@ -593,6 +604,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "错误：status:%#x, CalloutId:%x", status, calloutId);
+        if (fc->sid != NULL) {
+            ExFreePoolWithTag(fc->sid, TAG);
+        }
+        ExFreePoolWithTag(fc->processPath, TAG);
         ExFreePoolWithTag(fc, TAG);
         return;
     }

@@ -114,7 +114,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES* pClassifyValues, OUT PPENDED_PAC
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
-        packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_LOCAL_PORT].value.uint16;
+        packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_LOCAL_PORT].value.uint16;
 
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_REMOTE_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&packet->belongingFlow->DestinationIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
@@ -527,9 +527,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     }
 
     packetState = FwpsQueryPacketInjectionState(g_Transport_InjectionHandle, layerData, NULL);
-    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) || 
-        (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) ||
-        gDriverUnloading) {
+    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) || (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) || gDriverUnloading) {
         pClassifyOut->actionType = FWP_ACTION_PERMIT;
         if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
             pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
@@ -660,7 +658,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
         fc->DestinationIp.addressFamily = AF_INET;
 
-        fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+        fc->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
 
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
 
@@ -686,7 +684,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         fc->SourceIp.addressFamily = AF_INET6;
         //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
 
-        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
+        ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
 
         fc->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_PORT].value.uint16;
@@ -914,10 +912,17 @@ void StopWFP()
     InterlockedIncrement(&gDriverUnloading);
     KeReleaseInStackQueuedSpinLock(&flowListLockHandle);
 
-    status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
-    ASSERT(NT_SUCCESS(status));
-    status = FwpmEngineClose(g_EngineHandle);
-    ASSERT(NT_SUCCESS(status));
+    if (g_ChangeHandle != NULL) {
+        status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_ChangeHandle = NULL;
+    }
+
+    if (g_EngineHandle != NULL) {
+        status = FwpmEngineClose(g_EngineHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_EngineHandle = NULL;
+    }
 
     RemoveFlows();
 
@@ -1201,10 +1206,7 @@ NTSTATUS StartWFP()
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
     } else {
-        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject,
-                                                SubscriptionBFEStateChangeCallback,
-                                                NULL,
-                                                &g_ChangeHandle);
+        NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject, SubscriptionBFEStateChangeCallback, NULL, &g_ChangeHandle);
         if (!NT_SUCCESS(NtStatus)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "error: status:%#x", NtStatus);
             return NtStatus;
