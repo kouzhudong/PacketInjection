@@ -42,7 +42,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 
         packet->belongingFlow.DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_REMOTE_PORT].value.uint16;
 
-        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_DIRECTION].value.uint16;
+        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_DIRECTION].value.uint32;//DIRECTION字段是FWP_UINT32，不能按uint16读。
 
         break;
     }
@@ -60,7 +60,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 
         packet->belongingFlow.DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_IP_REMOTE_PORT].value.uint16;
 
-        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_DIRECTION].value.uint16;
+        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V6_DIRECTION].value.uint32;//DIRECTION字段是FWP_UINT32，不能按uint16读。
 
         break;
     }
@@ -76,7 +76,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 
         packet->belongingFlow.DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_REMOTE_PORT].value.uint16;
 
-        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_DIRECTION].value.uint16;
+        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_DIRECTION].value.uint32;//DIRECTION字段是FWP_UINT32，不能按uint16读。
 
         break;
     }
@@ -96,7 +96,7 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 
         packet->belongingFlow.DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_IP_REMOTE_PORT].value.uint16;
 
-        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_DIRECTION].value.uint16;
+        packet->belongingFlow.Direction = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V6_DIRECTION].value.uint32;//DIRECTION字段是FWP_UINT32，不能按uint16读。
 
         break;
     }
@@ -666,12 +666,12 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD://看看走到这里过没？
-        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4_DISCARD, g_CallOutId.DATAGRAM_DATA_V4_DISCARD);
-        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V4_DISCARD, g_CallOutId.STREAM_V4_DISCARD);
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V4);
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V4);
+        //不关联上下文：对应的*_TRANSPORT_*_DISCARD callout并未注册(g_CalloutFilter里被注释，id为0)，
+        //且AssociateOneContext的switch对DISCARD的ESTABLISHED层不填字段。这里关联只会失败并造成无谓的分配/释放。
+        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V4);
+        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V4);
 
-        //可继续添加.
+        //如需启用DISCARD流的上下文：1.在g_CalloutFilter注册对应DISCARD transport callout；2.补全AssociateOneContext里DISCARD的ESTABLISHED分支。
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6:
@@ -683,12 +683,9 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD://看看走到这里过没？
-        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6_DISCARD, g_CallOutId.DATAGRAM_DATA_V6_DISCARD);
-        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V6_DISCARD, g_CallOutId.STREAM_V6_DISCARD);
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V6);
-        AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V6);
-
-        //可继续添加.
+        //不关联上下文，原因同V4_DISCARD分支。
+        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V6);
+        //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V6);
 
         break;
     default:
@@ -734,6 +731,11 @@ VOID RemoveFlows()
     }
     KeReleaseInStackQueuedSpinLock(&lockHandle);
 }
+
+
+//把CALLOUTID当作UINT32数组遍历的前提：所有成员都是连续的UINT32、无填充。
+//新增非UINT32成员或导致填充时，下面的遍历会静默出错，故用C_ASSERT约束。
+C_ASSERT(sizeof(CALLOUTID) % sizeof(UINT32) == 0);
 
 
 void UnregisterAllCalloutId()

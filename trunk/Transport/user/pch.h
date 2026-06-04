@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <winsock2.h>//Do not include winsock.h and ws2def.h in the same module. Instead include only winsock2.h.
 #include <windows.h>
@@ -210,9 +210,9 @@ extern PRtlIpv6AddressToString Ipv6AddressToStringW;
 
 
 //https://msdn.microsoft.com/en-us/library/windows/desktop/ms738518%28v=vs.85%29.aspx?f=255&MSPPError=-2147217396
-//ÆäÊµ£ºIPV4µÄÖ»ĞèThis buffer should be large enough to hold at least 16 characters.
+//å…¶å®ï¼šIPV4çš„åªéœ€This buffer should be large enough to hold at least 16 characters.
 #define MAX_ADDRESS_STRING_LENGTH   64
 
 
-//Ê®½øÖÆµÄ¶Ë¿Ú×Ö·û´®µÄ³¤¶È¡£ÆäÊµ×î´ó³¤¶ÈÊÇ5£¬¿ÉÒÔÉèÖÃÎª8¡£
+//åè¿›åˆ¶çš„ç«¯å£å­—ç¬¦ä¸²çš„é•¿åº¦ã€‚å…¶å®æœ€å¤§é•¿åº¦æ˜¯5ï¼Œå¯ä»¥è®¾ç½®ä¸º8ã€‚
 #define MAX_PORT_STRING_LENGTH  5  //65535==FFFF 

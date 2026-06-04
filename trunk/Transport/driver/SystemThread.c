@@ -11,6 +11,9 @@ KEVENT g_PacketEvent;//有数据包入队时置位，唤醒工作线程，取代
 //在wfp.c中定义。释放一个FLOW_DATA的引用，引用计数归零时释放内存。
 void ReleaseFlowData(PFLOW_DATA flowData);
 
+//在CommunicationPort.c中定义。用rundown保护与应用层在线通信(FltSendMessage)期间，端口/通信进程不被PortDisconnect并发释放。
+extern EX_RUNDOWN_REF g_ClientPortRundown;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,23 +49,23 @@ Purpose:  Copies the NBL to a buffer.
             NET_BUFFER * pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL);
 
             for (UINT32 bytesCopied = 0; bytesCopied < numBytes && pNB; pNB = NET_BUFFER_NEXT_NB(pNB)) {
-                BYTE * pContiguousBuffer = 0;
                 UINT32 bytesNeeded = NET_BUFFER_DATA_LENGTH(pNB);
                 if (bytesNeeded) {
-                    BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePool2(POOL_FLAG_NON_PAGED, bytesNeeded, TAG);
-                    if (NULL == pAllocatedBuffer) {
-                        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "分配缓冲区失败，bytesNeeded:%u", bytesNeeded);
+                    //直接用目标缓冲作为NdisGetDataBuffer的存储，省去每个NB一次临时分配/释放。
+                    BYTE * pContiguousBuffer = (BYTE *)NdisGetDataBuffer(pNB, bytesNeeded, &pBuffer[bytesCopied], 1, 0);
+                    if (NULL == pContiguousBuffer) {
+                        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "NdisGetDataBuffer失败，bytesNeeded:%u", bytesNeeded);
                         ExFreePoolWithTag(pBuffer, TAG);
+                        *pSize = 0;
                         return NULL;
                     }
 
-                    pContiguousBuffer = (BYTE *)NdisGetDataBuffer(pNB, bytesNeeded, pAllocatedBuffer, 1, 0);
-
-                    RtlCopyMemory(&(pBuffer[bytesCopied]), pContiguousBuffer ? pContiguousBuffer : pAllocatedBuffer, bytesNeeded);
+                    //若数据本就连续，NdisGetDataBuffer返回其内部指针(并未写入存储)，此时才需手动拷贝。
+                    if (pContiguousBuffer != &pBuffer[bytesCopied]) {
+                        RtlCopyMemory(&pBuffer[bytesCopied], pContiguousBuffer, bytesNeeded);
+                    }
 
                     bytesCopied += bytesNeeded;
-
-                    ExFreePoolWithTag(pAllocatedBuffer, TAG);
                 }
             }
         }
@@ -129,7 +132,11 @@ NTSTATUS InboundInject(_In_ PPENDED_PACKET packet)
 
     // Adjust the net buffer list offset to the start of the IP header.
     ndisStatus = NdisRetreatNetBufferDataStart(netBuffer, packet->ipHeaderSize + packet->transportHeaderSize, 0, NULL);
-    _Analysis_assume_(ndisStatus == NDIS_STATUS_SUCCESS);
+    if (ndisStatus != NDIS_STATUS_SUCCESS) {
+        //回退失败(通常是内存不足)。此时并未前移，不能再调用NdisAdvanceNetBufferDataStart，直接返回。
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：NdisRetreatNetBufferDataStart失败，ndisStatus:%#x", ndisStatus);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
 
     // Note that the clone will inherit the original net buffer list's offset.
     status = FwpsAllocateCloneNetBufferList(packet->NetBufferList, NULL, NULL, 0, &clonedNetBufferList);
@@ -540,16 +547,21 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     ULONG replyLength;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     LARGE_INTEGER timeout = {0};
+    PEPROCESS userProcess = NULL;
 
     PAGED_CODE();
 
     //应用层没和驱动连接不隔离。
-    if (NULL == g_Data.ClientPort || NULL == g_Data.UserProcess) {
+    userProcess = g_Data.UserProcess;
+    if (NULL == g_Data.ClientPort || NULL == userProcess) {
         return IsBlock;
     }
 
-    //放过和驱动通讯的进程。
-    if (g_Data.UserProcess == PsGetCurrentProcess()) {
+    //放过和驱动通讯的进程自身的流量。
+    //注意：本函数在工作线程(System进程上下文)执行，PsGetCurrentProcess恒为System，旧的
+    //“g_Data.UserProcess == PsGetCurrentProcess()”判断永远不成立(失效)。这里改用流上下文
+    //里采集的发起进程PID与通信进程PID比对，否则通信进程自身的网络请求也会被送回它决策，可能死锁。
+    if ((HANDLE)(ULONG_PTR)packet->belongingFlow.processId == PsGetProcessId(userProcess)) {
         return IsBlock;
     }
 
@@ -560,6 +572,12 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     if (NULL == SentToUser) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "%s", "分配NOTIFICATION失败");
         return IsBlock;
+    }
+
+    //在线发送期间用rundown保护通信端口/通信进程不被并发的PortDisconnect释放(PortDisconnect会先等此处释放)。
+    if (!ExAcquireRundownProtection(&g_ClientPortRundown)) {
+        ExFreePoolWithTag(SentToUser, TAG);
+        return IsBlock;//端口正在或已经断开。
     }
 
     CopyPackInfo2User(packet, SentToUser);
@@ -596,6 +614,9 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     //结束的扫尾工作。
 
     UnMapPackInfo2User(packet, SentToUser);
+
+    ExReleaseRundownProtection(&g_ClientPortRundown);
+
     ExFreePoolWithTag(SentToUser, TAG);
     return IsBlock;
 }

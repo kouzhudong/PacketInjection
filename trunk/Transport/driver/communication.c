@@ -1,4 +1,4 @@
-#include "communication.h"
+ï»¿#include "communication.h"
 #include "..\public\public.h"
 
 //#include "trace.h"
@@ -31,14 +31,14 @@ NTSTATUS CreateClose(_In_ struct _DEVICE_OBJECT * DeviceObject, _Inout_ struct _
     case IRP_MJ_CREATE:
 #if defined(_WIN64)
         if (IoIs32bitProcess(Irp)) {
-            Status = STATUS_UNSUCCESSFUL;//²»Ö§³ÖWOW64.
+            Status = STATUS_UNSUCCESSFUL;//ä¸æ”¯æŒWOW64.
         }
 #endif
         if (STATUS_SUCCESS == Status) {
             //gLogProcess = PsGetCurrentProcessId();
         }
         break;
-    case IRP_MJ_CLOSE:/*¹Ø±Õ¾ä±úºÍ½ø³ÌÍË³ö»á×ßÕâÀï*/
+    case IRP_MJ_CLOSE:/*å…³é—­å¥æŸ„å’Œè¿›ç¨‹é€€å‡ºä¼šèµ°è¿™é‡Œ*/
 
         break;
     default:

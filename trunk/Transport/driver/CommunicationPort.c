@@ -5,6 +5,10 @@
 
 DATA g_Data;//  Structure that contains all the global data structures used throughout the scanner.
 
+//保护与应用层的在线通信(FltSendMessage)期间，ClientPort/UserProcess不被并发的PortDisconnect释放。
+//在CreateCommunicationPort初始化，PortConnect重置(rearm)，PortDisconnect排空(drain)，工作线程发送前后acquire/release。
+EX_RUNDOWN_REF g_ClientPortRundown;
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -148,6 +152,9 @@ NTSTATUS PortConnect(_In_ PFLT_PORT ClientPort,
     FLT_ASSERT(g_Data.ClientPort == NULL);
     FLT_ASSERT(g_Data.UserProcess == NULL);
 
+    //重置rundown，使上一次连接断开(drain)后本次连接可再次acquire。须在发布ClientPort/UserProcess前。
+    ExReInitializeRundownProtection(&g_ClientPortRundown);
+
     g_Data.UserProcess = PsGetCurrentProcess();
     g_Data.ClientPort = ClientPort;
 
@@ -162,6 +169,10 @@ VOID PortDisconnect(_In_opt_ PVOID ConnectionCookie)
     UNREFERENCED_PARAMETER(ConnectionCookie);
 
     PAGED_CODE();
+
+    //先等所有在途的FltSendMessage发送完成(工作线程释放rundown)，再关闭端口/清空进程，消除TOCTOU/UAF。
+    //drain之后acquire一律失败，直到下次PortConnect重置rundown。
+    ExWaitForRundownProtectionRelease(&g_ClientPortRundown);
 
     FltCloseClientPort(g_Data.Filter, &g_Data.ClientPort);//这个函数会把第二个参数设置为0.
 
@@ -275,6 +286,9 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     OBJECT_ATTRIBUTES oa;
     UNICODE_STRING uniString;
     PSECURITY_DESCRIPTOR sd;
+
+    //初始化rundown，必须在FltCreateCommunicationPort之前(连接成功后才可能触发PortConnect)。
+    ExInitializeRundownProtection(&g_ClientPortRundown);
 
     NTSTATUS status = FltRegisterFilter(DriverObject, &FilterRegistration, &g_Data.Filter);
     if (!NT_SUCCESS(status)) {
