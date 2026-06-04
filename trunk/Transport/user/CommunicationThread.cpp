@@ -1,4 +1,4 @@
-#include "log.h"
+ï»¿#include "log.h"
 #include "CommunicationThread.h"
 #include "rule.h"
 
@@ -8,7 +8,7 @@ DWORD g_thread_count = 0;
 HANDLE g_port;
 HANDLE g_completion;
 
-LONG g_SvcStop;//¿¼ÂÇÓÃÃüÃûµÄÊÂ¼ş¶ÔÏó£¬¿É¿ç½ø³Ì²Ù×÷¡£
+LONG g_SvcStop;//è€ƒè™‘ç”¨å‘½åçš„äº‹ä»¶å¯¹è±¡ï¼Œå¯è·¨è¿›ç¨‹æ“ä½œã€‚
 
 PRtlIpv6AddressToString Ipv6AddressToStringW;
 
@@ -18,22 +18,22 @@ PRtlIpv6AddressToString Ipv6AddressToStringW;
 
 DWORD WINAPI CommunicationThread(_In_ PVOID Context)
 /*
-×¢Òâ£º
-ÕâÀïÊÇµäĞÍµÄ¸ß²¢·¢µÍÑÓ³ÙµÄº¯Êı£¬¾ßÌåÌåÏÖÊÇ£º
-¸ß²¢·¢£º¶àÏß³Ì£¬ÇÒÓĞºÜ¶àµÄÏûÏ¢·¢À´£¬Èç£ºÎÄ¼ş£¬½ø³Ì£¬ÍøÂç£¬×¢²á±íµÈ£¬Ã¿Ãë³ÉÇ§ÉÏÍò¸ö¡£
-µÍÑÓ³Ù£ºÇı¶¯ÔÚµÈ´ı£¬±ØĞëºÜ¿ì´¦Àí£¬·ñÕß±ğµÄ½ø³ÌºÍÏµÍ³³öÏÖ¿¨ÂıµÈÏÖÏó¡£
+æ³¨æ„ï¼š
+è¿™é‡Œæ˜¯å…¸å‹çš„é«˜å¹¶å‘ä½å»¶è¿Ÿçš„å‡½æ•°ï¼Œå…·ä½“ä½“ç°æ˜¯ï¼š
+é«˜å¹¶å‘ï¼šå¤šçº¿ç¨‹ï¼Œä¸”æœ‰å¾ˆå¤šçš„æ¶ˆæ¯å‘æ¥ï¼Œå¦‚ï¼šæ–‡ä»¶ï¼Œè¿›ç¨‹ï¼Œç½‘ç»œï¼Œæ³¨å†Œè¡¨ç­‰ï¼Œæ¯ç§’æˆåƒä¸Šä¸‡ä¸ªã€‚
+ä½å»¶è¿Ÿï¼šé©±åŠ¨åœ¨ç­‰å¾…ï¼Œå¿…é¡»å¾ˆå¿«å¤„ç†ï¼Œå¦è€…åˆ«çš„è¿›ç¨‹å’Œç³»ç»Ÿå‡ºç°å¡æ…¢ç­‰ç°è±¡ã€‚
 
-ËùÒÔ£º
-ÕâÀïµÄ×ö·¨ÊÇ£º
-´ó²¿·ÖÊÇ´¿ÄÚ´æ²Ù×÷¡£
-¾¡Á¿¼õÉÙ¸÷ÖÖIO²Ù×÷£¬Èç£ºÎÄ¼ş£¬ÍøÂç£¬×¢²á±í£¬½ø³ÌºÍ½øÈëÄÚºËµÄº¯Êı¡£
-¾¡Á¿¼õÉÙÃÜ¼¯ĞÍµÄCPU²Ù×÷£¬Èç£º¸÷ÖÖ¹şÏ£ÖµµÄ¼ÆËã¡£
-¸÷ÖÖËøÒª´¦ÀíºÃ£¬±ÜÃâËÀËø¡£
+æ‰€ä»¥ï¼š
+è¿™é‡Œçš„åšæ³•æ˜¯ï¼š
+å¤§éƒ¨åˆ†æ˜¯çº¯å†…å­˜æ“ä½œã€‚
+å°½é‡å‡å°‘å„ç§IOæ“ä½œï¼Œå¦‚ï¼šæ–‡ä»¶ï¼Œç½‘ç»œï¼Œæ³¨å†Œè¡¨ï¼Œè¿›ç¨‹å’Œè¿›å…¥å†…æ ¸çš„å‡½æ•°ã€‚
+å°½é‡å‡å°‘å¯†é›†å‹çš„CPUæ“ä½œï¼Œå¦‚ï¼šå„ç§å“ˆå¸Œå€¼çš„è®¡ç®—ã€‚
+å„ç§é”è¦å¤„ç†å¥½ï¼Œé¿å…æ­»é”ã€‚
 
-»ùÓÚÒÔÉÏµÄ½áÂÛ£º
-1.¾¯¸æÈÕÖ¾µÄÉÏ´«ÒªÁí¿ªÒ»¸öÏß³Ì£¬ÒòÎªÕâÀïÓĞÍøÂç²Ù×÷£¬ÌØ±ğÊÇÍ¬²½µÄ¡£
-2.¼õÉÙÈÕÖ¾µÄ´òÓ¡£¬°üÀ¨debugviewµÄ¡£
-3.²»ÄÜµÈ´ı±ğÈË£¬Ö»ÓĞ±ğÈËµÈ´ıÕâÀï¡£
+åŸºäºä»¥ä¸Šçš„ç»“è®ºï¼š
+1.è­¦å‘Šæ—¥å¿—çš„ä¸Šä¼ è¦å¦å¼€ä¸€ä¸ªçº¿ç¨‹ï¼Œå› ä¸ºè¿™é‡Œæœ‰ç½‘ç»œæ“ä½œï¼Œç‰¹åˆ«æ˜¯åŒæ­¥çš„ã€‚
+2.å‡å°‘æ—¥å¿—çš„æ‰“å°ï¼ŒåŒ…æ‹¬debugviewçš„ã€‚
+3.ä¸èƒ½ç­‰å¾…åˆ«äººï¼Œåªæœ‰åˆ«äººç­‰å¾…è¿™é‡Œã€‚
 */
 {
     PMESSAGE message = NULL;
@@ -48,6 +48,12 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
         DWORD outSize;
         ULONG_PTR key;
         BOOL result = GetQueuedCompletionStatus(g_completion, &outSize, &key, &pOvlp, INFINITE);
+        if (NULL == pOvlp) {
+            //å®Œæˆç«¯å£è¢«å…³é—­ï¼Œæˆ–å®Œæˆç«¯å£å¥æŸ„å‡ºé”™æ—¶æ²¡æœ‰å–å‡ºä»»ä½•åŒ…ï¼Œé¿å…CONTAINING_RECORDå¾—åˆ°é‡æŒ‡é’ˆã€‚
+            hr = HRESULT_FROM_WIN32(GetLastError());
+            LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, pOvlp is NULL, LastError:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), hr);
+            break;
+        }
         message = CONTAINING_RECORD(pOvlp, MESSAGE, Ovlp);
         if (!result) {
             hr = HRESULT_FROM_WIN32(GetLastError());
@@ -56,23 +62,23 @@ DWORD WINAPI CommunicationThread(_In_ PVOID Context)
         }
 
         /*
-        ¶ÔÉÏ±¨µÄĞÅÏ¢½øĞĞ´¦Àí£¬Æ¥Åä¹æÔò£¬²¢·µ»Ø½á¹û¡£
+        å¯¹ä¸ŠæŠ¥çš„ä¿¡æ¯è¿›è¡Œå¤„ç†ï¼ŒåŒ¹é…è§„åˆ™ï¼Œå¹¶è¿”å›ç»“æœã€‚
         */
         REPLY_MESSAGE replyMessage = {0};
         replyMessage.ReplyHeader.Status = 0;
         replyMessage.ReplyHeader.MessageId = message->MessageHeader.MessageId;
         replyMessage.Reply.IsBlock = DisposeMessage(&message->Notification);
         hr = FilterReplyMessage(g_port, (PFILTER_REPLY_HEADER)&replyMessage, sizeof(replyMessage));
-        if (!SUCCEEDED(hr)) {//ERROR_FLT_NO_WAITER_FOR_REPLY ×¢Òâ£ºµ÷ÊÔ×´Ì¬ÏÂ»á³¬Ê±¡£
+        if (!SUCCEEDED(hr)) {//ERROR_FLT_NO_WAITER_FOR_REPLY æ³¨æ„ï¼šè°ƒè¯•çŠ¶æ€ä¸‹ä¼šè¶…æ—¶ã€‚
             LOGW(ERROR_LEVEL, "FUNCTION:%ls, tid:%d, LastError:%#x, result:%#x", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId(), GetLastError(), hr);
-            //break; //²»breakÒ²²»continue£¬½ö½ö´òÓ¡Ò»¸öĞÅÏ¢£¬¶ÔĞÔÄÜºÍ¹¦ÄÜÎŞÓ°Ïì¡£
+            //break; //ä¸breakä¹Ÿä¸continueï¼Œä»…ä»…æ‰“å°ä¸€ä¸ªä¿¡æ¯ï¼Œå¯¹æ€§èƒ½å’ŒåŠŸèƒ½æ— å½±å“ã€‚
         }
 
         /*
-        ÍË³öµÄÊ±»ú£¬±ØĞëÔÚFilterGetMessageÖ®Ç°£¬ÕâÊÇĞÂµÄ¿ªÊ¼£¬×îºÃÔÚFilterReplyMessageÖ®ºó¡£
-        ·ñÔòÔÚÊÍ·ÅÄÚ´æ£¨message£©Ê±£¬·¢Éú£º
+        é€€å‡ºçš„æ—¶æœºï¼Œå¿…é¡»åœ¨FilterGetMessageä¹‹å‰ï¼Œè¿™æ˜¯æ–°çš„å¼€å§‹ï¼Œæœ€å¥½åœ¨FilterReplyMessageä¹‹åã€‚
+        å¦åˆ™åœ¨é‡Šæ”¾å†…å­˜ï¼ˆmessageï¼‰æ—¶ï¼Œå‘ç”Ÿï¼š
         VERIFIER STOP 0000000000000802: pid 0xE44: Using a freed address in a pending I/O operation.
-        ÕâËµÃ÷Õâ¸ö²Ù×÷»¹Ã»Íê³É¡£
+        è¿™è¯´æ˜è¿™ä¸ªæ“ä½œè¿˜æ²¡å®Œæˆã€‚
         */
         if (InterlockedCompareExchange(&g_SvcStop, 0, 0)) {
             LOGW(IMPORTANT_INFO_LEVEL, "FUNCTION:%ls, tid:%d", _CRT_WIDE(__FUNCTION__), GetCurrentThreadId());
@@ -137,24 +143,39 @@ void work()
     }
 
     g_completion = CreateIoCompletionPort(g_port, NULL, 0, dwThreadCount);
-    _ASSERTE(g_completion != NULL);
+    if (NULL == g_completion) {
+        LOGA(ERROR_LEVEL, "CreateIoCompletionPort failed, LastError:%#x", GetLastError());
+        CloseHandle(g_port);
+        g_port = NULL;
+        return;
+    }
 
     DWORD dwThreadId;
     for (; g_thread_count < dwThreadCount; g_thread_count++) {
         g_hThread[g_thread_count] = CreateThread(NULL, 0, CommunicationThread, NULL, 0, &dwThreadId);
-        _ASSERTE(g_hThread[g_thread_count]);
+        if (NULL == g_hThread[g_thread_count]) {
+            LOGA(ERROR_LEVEL, "CreateThread failed, LastError:%#x", GetLastError());
+            break;
+        }
     }
 
     /*
-    Õâ¸öÑ­»·Ò²¿ÉÒÔ¿¼ÂÇ·Åµ½ÉÏÃæµÄÑ­»·Àï×ö¡£
+    è¿™ä¸ªå¾ªç¯ä¹Ÿå¯ä»¥è€ƒè™‘æ”¾åˆ°ä¸Šé¢çš„å¾ªç¯é‡Œåšã€‚
     */
-    for (g_thread_count = 0; g_thread_count < dwThreadCount; g_thread_count++) {
-        PMESSAGE msg = (PMESSAGE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MESSAGE));//Õâ¸öÄÚ´æÔÚÏß³ÌÍË³öÊ±ÊÍ·Å¡£
-        _ASSERTE(msg != NULL);
+    for (DWORD i = 0; i < dwThreadCount; i++) {
+        PMESSAGE msg = (PMESSAGE)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(MESSAGE));//è¿™ä¸ªå†…å­˜åœ¨çº¿ç¨‹é€€å‡ºæ—¶é‡Šæ”¾ã€‚
+        if (NULL == msg) {
+            LOGA(ERROR_LEVEL, "HeapAlloc MESSAGE failed");
+            break;
+        }
 
         memset(&msg->Ovlp, 0, sizeof(OVERLAPPED));
         hr = FilterGetMessage(g_port, &msg->MessageHeader, FIELD_OFFSET(MESSAGE, Ovlp), &msg->Ovlp);
-        _ASSERTE(hr == HRESULT_FROM_WIN32(ERROR_IO_PENDING));
+        if (hr != HRESULT_FROM_WIN32(ERROR_IO_PENDING)) {
+            LOGA(ERROR_LEVEL, "FilterGetMessage failed, hr:%#x", hr);
+            HeapFree(GetProcessHeap(), 0, msg);
+            break;
+        }
     }
 
     DWORD ret = WaitForMultipleObjects(g_thread_count, g_hThread, TRUE, INFINITE);

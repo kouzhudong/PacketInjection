@@ -1,11 +1,15 @@
-#include "SystemThread.h"
+ï»¿#include "SystemThread.h"
 #include "wfp.h"
 #include "CommunicationPort.h"
 #include "..\public\public.h"
 
 
-LIST_ENTRY g_PacketList;/*PENDED_PACKETÀàĞÍµÄÁ´±í,ÓÃÓÚ±£´æTCPºÍUDPµÄ²Ù×÷.*/
+LIST_ENTRY g_PacketList;/*PENDED_PACKETç±»å‹çš„é“¾è¡¨,ç”¨äºä¿å­˜TCPå’ŒUDPçš„æ“ä½œ.*/
 KSPIN_LOCK g_PacketListLock;
+KEVENT g_PacketEvent;//æœ‰æ•°æ®åŒ…å…¥é˜Ÿæ—¶ç½®ä½ï¼Œå”¤é†’å·¥ä½œçº¿ç¨‹ï¼Œå–ä»£è½®è¯¢ã€‚
+
+//åœ¨wfp.cä¸­å®šä¹‰ã€‚é‡Šæ”¾ä¸€ä¸ªFLOW_DATAçš„å¼•ç”¨ï¼Œå¼•ç”¨è®¡æ•°å½’é›¶æ—¶é‡Šæ”¾å†…å­˜ã€‚
+void ReleaseFlowData(PFLOW_DATA flowData);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,9 +36,11 @@ Purpose:  Copies the NBL to a buffer.
     }
 
     if (numBytes) {
-        pBuffer = (BYTE *)ExAllocatePool2(POOL_FLAG_NON_PAGED, numBytes, TAG);
-        ASSERT(pBuffer);
-        RtlZeroMemory(pBuffer, numBytes);
+        pBuffer = (BYTE *)ExAllocatePool2(POOL_FLAG_NON_PAGED, numBytes, TAG);//ExAllocatePool2é»˜è®¤æ¸…é›¶ã€‚
+        if (NULL == pBuffer) {
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "åˆ†é…ç¼“å†²åŒºå¤±è´¥ï¼ŒnumBytes:%u", numBytes);
+            return NULL;
+        }
 
         if (pTemplateNBL) {
             NET_BUFFER * pNB = NET_BUFFER_LIST_FIRST_NB(pTemplateNBL);
@@ -44,8 +50,11 @@ Purpose:  Copies the NBL to a buffer.
                 UINT32 bytesNeeded = NET_BUFFER_DATA_LENGTH(pNB);
                 if (bytesNeeded) {
                     BYTE * pAllocatedBuffer = (BYTE *)ExAllocatePool2(POOL_FLAG_NON_PAGED, bytesNeeded, TAG);
-                    ASSERT(pAllocatedBuffer);
-                    RtlZeroMemory(pAllocatedBuffer, bytesNeeded);
+                    if (NULL == pAllocatedBuffer) {
+                        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "åˆ†é…ç¼“å†²åŒºå¤±è´¥ï¼ŒbytesNeeded:%u", bytesNeeded);
+                        ExFreePoolWithTag(pBuffer, TAG);
+                        return NULL;
+                    }
 
                     pContiguousBuffer = (BYTE *)NdisGetDataBuffer(pNB, bytesNeeded, pAllocatedBuffer, 1, 0);
 
@@ -75,9 +84,14 @@ void FreePendedPacket(_Inout_ __drv_freesMem(Mem) PPENDED_PACKET packet)
         ExFreePoolWithTag(packet->controlData, TAG);
     }
 
+    //é‡Šæ”¾å¯¹æµä¸Šä¸‹æ–‡çš„å¼•ç”¨ã€‚belongingFlowä¸­çš„processPath/sidæŒ‡é’ˆæŒ‡å‘è¯¥ä¸Šä¸‹æ–‡ã€‚
+    if (packet->Context != NULL) {
+        ReleaseFlowData(packet->Context);
+    }
+
     ExFreePoolWithTag(packet, TAG);
 
-    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ĞÅÏ¢£ºÊÍ·Å DataGram packet:%p", packet);
+    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ä¿¡æ¯ï¼šé‡Šæ”¾ DataGram packet:%p", packet);
 }
 
 
@@ -123,39 +137,11 @@ NTSTATUS InboundInject(_In_ PPENDED_PACKET packet)
     // Undo the adjustment on the original net buffer list.
     NdisAdvanceNetBufferDataStart(netBuffer, packet->ipHeaderSize + packet->transportHeaderSize, FALSE, NULL);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         return status;
     }
 
     if (packet->ipSecProtected) {
-        UINT8 * remoteAddr = NULL;
-        UINT8 * localAddr = NULL;
-
-        switch (packet->belongingFlow.addressFamily) {
-        case AF_INET:
-        {
-            ULONG ra = RtlUlongByteSwap(packet->belongingFlow.DestinationIp.ipv4.S_un.S_addr);
-            ULONG la = RtlUlongByteSwap(packet->belongingFlow.SourceIp.ipv4.S_un.S_addr);
-
-            remoteAddr = (UINT8 *)&ra;
-            localAddr = (UINT8 *)&la;
-
-            Transport_InjectionHandle = g_Transport4_InjectionHandle;
-
-            break;
-        }
-        case AF_INET6:
-            remoteAddr = (UINT8 *)&packet->belongingFlow.DestinationIp.ipv6;
-            localAddr = (UINT8 *)&packet->belongingFlow.DestinationIp.ipv6;
-
-            Transport_InjectionHandle = g_Transport6_InjectionHandle;
-
-            break;
-        default:
-            ASSERT(FALSE);
-            break;
-        }
-
         // When an IpSec protected packet is indicated to AUTH_RECV_ACCEPT or INBOUND_TRANSPORT layers,
         // for performance reasons the tcpip stack does not remove the AH/ESP header from the packet.
         // And such packets cannot be recv-injected back to the stack w/o removing the AH/ESP header.
@@ -187,7 +173,7 @@ NTSTATUS InboundInject(_In_ PPENDED_PACKET packet)
                                                          0,
                                                          0);
         if (!NT_SUCCESS(status)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
             FwpsFreeCloneNetBufferList(clonedNetBufferList, 0);
             return status;
         }
@@ -230,7 +216,7 @@ NTSTATUS InboundInject(_In_ PPENDED_PACKET packet)
                                              InjectComplete,
                                              packet);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         FwpsFreeCloneNetBufferList(clonedNetBufferList, 0);
     }
 
@@ -245,30 +231,19 @@ NTSTATUS OutboundInject(_In_ PPENDED_PACKET packet)
     FWPS_TRANSPORT_SEND_PARAMS sendArgs = {0};
     //BOOLEAN isIPv6 = !LayerIsIPv4(packet->belongingFlow.layerId);
     HANDLE Transport_InjectionHandle = NULL;
-    UINT8 * remoteAddr = NULL;
 
     status = FwpsAllocateCloneNetBufferList(packet->NetBufferList, NULL, NULL, 0, &clonedNetBufferList);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         return status;
     }
 
     switch (packet->belongingFlow.addressFamily) {
     case AF_INET:
-    {
-        ULONG ra = RtlUlongByteSwap(packet->belongingFlow.DestinationIp.ipv4.S_un.S_addr);
-
-        remoteAddr = (UINT8 *)&ra;
-
         Transport_InjectionHandle = g_Transport4_InjectionHandle;
-
         break;
-    }
     case AF_INET6:
-        remoteAddr = (UINT8 *)&packet->belongingFlow.DestinationIp.ipv6;
-
         Transport_InjectionHandle = g_Transport6_InjectionHandle;
-
         break;
     default:
         ASSERT(FALSE);
@@ -311,7 +286,7 @@ NTSTATUS OutboundInject(_In_ PPENDED_PACKET packet)
                                           InjectComplete,
                                           packet);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         FwpsFreeCloneNetBufferList(clonedNetBufferList, 0);
     }
 
@@ -335,7 +310,7 @@ NTSTATUS inject(PPENDED_PACKET packet)
 
 void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 /*
-¹¦ÄÜ£º¸´ÖÆPPENDED_PACKETµÄĞÅÏ¢£¬°üÀ¨PFLOW_DATAµÄĞÅÏ¢£¬µ½PNOTIFICATION¡£
+åŠŸèƒ½ï¼šå¤åˆ¶PPENDED_PACKETçš„ä¿¡æ¯ï¼ŒåŒ…æ‹¬PFLOW_DATAçš„ä¿¡æ¯ï¼Œåˆ°PNOTIFICATIONã€‚
 */
 {
     SentToUser->Direction = packet->belongingFlow.Direction;
@@ -381,7 +356,7 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
         temp.Length = (USHORT)packet->belongingFlow.size;
         temp.MaximumLength = temp.Length;
 
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "¾¯¸æ£ºprocessPath:%wZ", temp);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "è­¦å‘Šï¼šprocessPath:%wZ", temp);
     }
 
     SentToUser->size = min(MAX_PATH * sizeof(WCHAR), packet->belongingFlow.size);
@@ -393,9 +368,9 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
 void CopyToUserMemory(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 /*
-ÒòÎªÊı¾İÃ»ÓĞÓ³Éä¹ıÈ¥£¬ËùÒÔÕâÀï¸´ÖÆ¹ıÈ¥¡£
+å› ä¸ºæ•°æ®æ²¡æœ‰æ˜ å°„è¿‡å»ï¼Œæ‰€ä»¥è¿™é‡Œå¤åˆ¶è¿‡å»ã€‚
 
-ÓÃÍ¾£º·ÃÎÊÓ³ÉäµÄÓ¦ÓÃ²ãÄÚ´æ¡£
+ç”¨é€”ï¼šè®¿é—®æ˜ å°„çš„åº”ç”¨å±‚å†…å­˜ã€‚
 */
 {
     KAPC_STATE   ApcState;
@@ -412,7 +387,7 @@ void CopyToUserMemory(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
         RtlCopyMemory(SentToUser->UserBuffer, packet->KernelBuffer, packet->KernelBufferLength);
 
-        SentToUser->DataLength = packet->KernelBufferLength;//ÉÏÃæ³É¹¦ÁË£¬²ÅÅªÕâ¸ö¡£
+        SentToUser->DataLength = packet->KernelBufferLength;//ä¸Šé¢æˆåŠŸäº†ï¼Œæ‰å¼„è¿™ä¸ªã€‚
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         Print(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "ExceptionCode:%#x", GetExceptionCode());
     }
@@ -423,11 +398,11 @@ void CopyToUserMemory(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
 void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 /*
-¹¦ÄÜ£º°ÑÍøÂçĞÅÏ¢Ó³Éäµ½ºÍÇı¶¯Í¨Ñ¶µÄ½ø³Ì¡£
-      È¥µô¿ÉĞ´µÄÊôĞÔ£¬ÒòÎªÔİÊ±²»Ö§³ÖĞŞ¸ÄµÄ²Ù×÷¡£
+åŠŸèƒ½ï¼šæŠŠç½‘ç»œä¿¡æ¯æ˜ å°„åˆ°å’Œé©±åŠ¨é€šè®¯çš„è¿›ç¨‹ã€‚
+      å»æ‰å¯å†™çš„å±æ€§ï¼Œå› ä¸ºæš‚æ—¶ä¸æ”¯æŒä¿®æ”¹çš„æ“ä½œã€‚
 
-ÊµÏÖ°ì·¨£º
-1.MmMapLockedPagesSpecifyCache + KeStackAttachProcess¡£
+å®ç°åŠæ³•ï¼š
+1.MmMapLockedPagesSpecifyCache + KeStackAttachProcessã€‚
 2.ZwMapViewOfSection
 3.MmmapViewOfSection
 */
@@ -444,15 +419,15 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
     packet->KernelBuffer = NBLCopyToBuffer(packet->NetBufferList, &packet->KernelBufferLength);
     if (NULL == packet->KernelBuffer) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "×¢Òâ£º¸´ÖÆÍøÂçÊı¾İÊ§°Ü£¬³¤¶È£º%d", (int)packet->DataLength);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "æ³¨æ„ï¼šå¤åˆ¶ç½‘ç»œæ•°æ®å¤±è´¥ï¼Œé•¿åº¦ï¼š%d", (int)packet->DataLength);
         return;
     }
 
     if (packet->DataLength != packet->KernelBufferLength) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                "¾¯¸æ£ºÍøÂçÊı¾İ¿ÉÄÜ¶ªÊ§£¬DataLength£º%d£¬KernelBufferLength£º%d",
+                "è­¦å‘Šï¼šç½‘ç»œæ•°æ®å¯èƒ½ä¸¢å¤±ï¼ŒDataLengthï¼š%dï¼ŒKernelBufferLengthï¼š%d",
                 (int)packet->DataLength,
-                (int)packet->KernelBufferLength);//´ËÊ±£¬Ó¦ÒÔÕâ¸öÎª×¼¡£
+                (int)packet->KernelBufferLength);//æ­¤æ—¶ï¼Œåº”ä»¥è¿™ä¸ªä¸ºå‡†ã€‚
     }
 
     MaximumSize.QuadPart = packet->KernelBufferLength;
@@ -465,19 +440,19 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
                              SEC_COMMIT,
                              NULL);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         return;
     }
 
     status = ObOpenObjectByPointer(g_Data.UserProcess,
                                    OBJ_KERNEL_HANDLE,
                                    NULL,
-                                   GENERIC_ALL | PROCESS_VM_OPEARATION | 0xfff,
+                                   PROCESS_ALL_ACCESS,
                                    *PsProcessType,
                                    UserMode,
-                                   &Handle);//×¢ÒâÒª¹Ø±Õ¾ä±ú¡£  
+                                   &Handle);//æ³¨æ„è¦å…³é—­å¥æŸ„ã€‚  
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         ZwClose(Section);
         return;
     }
@@ -493,13 +468,13 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
                                 0L,
                                 PAGE_READWRITE); //PAGE_READONLY PAGE_EXECUTE_READWRITE
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
     } else {
-        CopyToUserMemory(packet, SentToUser);//Êı¾İÃ»Ó³Éä£¬Ö»ºÃÉèÖÃ¿ÉĞ´ÊôĞÔ£¬È»ºó¸´ÖÆ¡£
-        //Èç¹û²»Ö§³ÖĞŞ¸ÄÍøÂçÊı¾İ£¬¿ÉÉèÖÃÄÚ´æÎªÖ»¶ÁÊôĞÔ¡£
+        CopyToUserMemory(packet, SentToUser);//æ•°æ®æ²¡æ˜ å°„ï¼Œåªå¥½è®¾ç½®å¯å†™å±æ€§ï¼Œç„¶åå¤åˆ¶ã€‚
+        //å¦‚æœä¸æ”¯æŒä¿®æ”¹ç½‘ç»œæ•°æ®ï¼Œå¯è®¾ç½®å†…å­˜ä¸ºåªè¯»å±æ€§ã€‚
     }
 
-    //ZwUnmapViewOfSection(Handle, ViewBase);//ÕâÀï½ûÖ¹´Ë²Ù×÷¡£
+    //ZwUnmapViewOfSection(Handle, ViewBase);//è¿™é‡Œç¦æ­¢æ­¤æ“ä½œã€‚
     ZwClose(Section);
     ZwClose(Handle);
 }
@@ -507,11 +482,11 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
 void UnMapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 /*
-¹¦ÄÜ£º°ÑÍøÂçĞÅÏ¢Ó³Éäµ½ºÍÇı¶¯Í¨Ñ¶µÄ½ø³Ì¡£
-      È¥µô¿ÉĞ´µÄÊôĞÔ£¬ÒòÎªÔİÊ±²»Ö§³ÖĞŞ¸ÄµÄ²Ù×÷¡£
+åŠŸèƒ½ï¼šæŠŠç½‘ç»œä¿¡æ¯æ˜ å°„åˆ°å’Œé©±åŠ¨é€šè®¯çš„è¿›ç¨‹ã€‚
+      å»æ‰å¯å†™çš„å±æ€§ï¼Œå› ä¸ºæš‚æ—¶ä¸æ”¯æŒä¿®æ”¹çš„æ“ä½œã€‚
 
-ÊµÏÖ°ì·¨£º
-1.MmMapLockedPagesSpecifyCache + KeStackAttachProcess¡£
+å®ç°åŠæ³•ï¼š
+1.MmMapLockedPagesSpecifyCache + KeStackAttachProcessã€‚
 2.ZwMapViewOfSection
 3.MmmapViewOfSection
 */
@@ -523,21 +498,21 @@ void UnMapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
         status = ObOpenObjectByPointer(g_Data.UserProcess,
                                        OBJ_KERNEL_HANDLE,
                                        NULL,
-                                       GENERIC_ALL | PROCESS_VM_OPEARATION | 0xfff,
+                                       PROCESS_ALL_ACCESS,
                                        *PsProcessType,
                                        UserMode,
-                                       &KernelHandle);//×¢ÒâÒª¹Ø±Õ¾ä±ú¡£  
+                                       &KernelHandle);//æ³¨æ„è¦å…³é—­å¥æŸ„ã€‚  
         if (!NT_SUCCESS(status)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         } else {
             __try {
                 /*
-                ¾ä±ú±ØĞëÊÇÄÚºË¾ä±ú¡£
-                ¾ä±úĞèÒªUNMAPÈ¨ÏŞ¡£
+                å¥æŸ„å¿…é¡»æ˜¯å†…æ ¸å¥æŸ„ã€‚
+                å¥æŸ„éœ€è¦UNMAPæƒé™ã€‚
                 */
                 status = ZwUnmapViewOfSection(KernelHandle, SentToUser->UserBuffer);
                 if (!NT_SUCCESS(status)) {
-                    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+                    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
                 }
             } __except (EXCEPTION_EXECUTE_HANDLER) {
                 Print(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "ExceptionCode:%#x", GetExceptionCode());
@@ -555,9 +530,9 @@ void UnMapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
 BOOL IsBlockPacker(PPENDED_PACKET packet)
 /*
-µ÷ÓÃFltSendMessageÊµÏÖ¡£
+è°ƒç”¨FltSendMessageå®ç°ã€‚
 
-¿ÉÒÔ×öÒ»Ğ©×¼±¸£¬Èç£ºÓ³Éä°üµÄÄÚ´æµ½Ó¦ÓÃ²ã£¬ÔİÊ±ÉèÖÃÄÚ´æÎªÖ»¶Á£¬²»¿ÉĞŞ¸Ä¡£
+å¯ä»¥åšä¸€äº›å‡†å¤‡ï¼Œå¦‚ï¼šæ˜ å°„åŒ…çš„å†…å­˜åˆ°åº”ç”¨å±‚ï¼Œæš‚æ—¶è®¾ç½®å†…å­˜ä¸ºåªè¯»ï¼Œä¸å¯ä¿®æ”¹ã€‚
 */
 {
     BOOL IsBlock = FALSE;
@@ -568,22 +543,24 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
 
     PAGED_CODE();
 
-    //Ó¦ÓÃ²ãÃ»ºÍÇı¶¯Á¬½Ó²»¸ôÀë¡£
+    //åº”ç”¨å±‚æ²¡å’Œé©±åŠ¨è¿æ¥ä¸éš”ç¦»ã€‚
     if (NULL == g_Data.ClientPort || NULL == g_Data.UserProcess) {
         return IsBlock;
     }
 
-    //·Å¹ıºÍÇı¶¯Í¨Ñ¶µÄ½ø³Ì¡£
+    //æ”¾è¿‡å’Œé©±åŠ¨é€šè®¯çš„è¿›ç¨‹ã€‚
     if (g_Data.UserProcess == PsGetCurrentProcess()) {
         return IsBlock;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //ÌîĞ´·µ»Ø¸øÓ¦ÓÃ²ãµÄĞÅÏ¢¡£
+    //å¡«å†™è¿”å›ç»™åº”ç”¨å±‚çš„ä¿¡æ¯ã€‚
 
-    SentToUser = ExAllocatePool2(POOL_FLAG_PAGED, sizeof(NOTIFICATION), TAG);
-    ASSERT(SentToUser);
-    RtlZeroMemory(SentToUser, sizeof(NOTIFICATION));
+    SentToUser = ExAllocatePool2(POOL_FLAG_PAGED, sizeof(NOTIFICATION), TAG);//ExAllocatePool2é»˜è®¤æ¸…é›¶ã€‚
+    if (NULL == SentToUser) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "%s", "åˆ†é…NOTIFICATIONå¤±è´¥");
+        return IsBlock;
+    }
 
     CopyPackInfo2User(packet, SentToUser);
     MapPackInfo2User(packet, SentToUser);
@@ -591,8 +568,8 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ÍøÂç²Ù×÷²»ÏñÎÄ¼ş£¬¶àµÈ´ı¼¸ÃëÖÓ£¬Ò»°ã²»»á¿¨µÄ£¬¶¥¶àÍøÂçÂı£¬³ı·ÇÍ¬²½ÇÒµ¥Ïß³ÌµÄ±¿·¨¡£
-    ¿ØÖÆÌ¨µÄ´òÓ¡×Ö·ûÒ²Í¦Õ¼ÓÃÊ±¼äºÍCPUµÄ¡£
+    ç½‘ç»œæ“ä½œä¸åƒæ–‡ä»¶ï¼Œå¤šç­‰å¾…å‡ ç§’é’Ÿï¼Œä¸€èˆ¬ä¸ä¼šå¡çš„ï¼Œé¡¶å¤šç½‘ç»œæ…¢ï¼Œé™¤éåŒæ­¥ä¸”å•çº¿ç¨‹çš„ç¬¨æ³•ã€‚
+    æ§åˆ¶å°çš„æ‰“å°å­—ç¬¦ä¹ŸæŒºå ç”¨æ—¶é—´å’ŒCPUçš„ã€‚
     */
     replyLength = sizeof(REPLY);
     timeout.QuadPart = -((LONGLONG)10) * (LONGLONG)1000 * (LONGLONG)1000 * 1; // 1s
@@ -616,7 +593,7 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //½áÊøµÄÉ¨Î²¹¤×÷¡£
+    //ç»“æŸçš„æ‰«å°¾å·¥ä½œã€‚
 
     UnMapPackInfo2User(packet, SentToUser);
     ExFreePoolWithTag(SentToUser, TAG);
@@ -631,9 +608,9 @@ VOID ProcessPacket(PPENDED_PACKET packet)
 
     if (IsBlock) {
         /*
-        ²»½øĞĞ×¢Èë²Ù×÷.
+        ä¸è¿›è¡Œæ³¨å…¥æ“ä½œ.
         */
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "×¢Òâ£ºpacket:0x%p", packet);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "æ³¨æ„ï¼špacket:0x%p", packet);
     } else {
         if (!packet->belongingFlow.deleting) {
             NTSTATUS status = inject(packet);
@@ -674,22 +651,29 @@ VOID WorkThread(_In_ PVOID StartContext)
             packet = CONTAINING_RECORD(listEntry, PENDED_PACKET, listEntry);
             ProcessPacket(packet);
         } else {
-            LARGE_INTEGER   li;
-
-            li.QuadPart = (1 * (((-10) * 1000) * 1000)); //¸ºÊıÊÇÔİÍ£1ÃëÖÓ¡£
-            KeDelayExecutionThread(KernelMode, FALSE, &li);
+            //ç­‰å¾…æ–°åŒ…å…¥é˜Ÿï¼ˆæˆ–å¸è½½æ—¶è¢«å”¤é†’ï¼‰ï¼Œå–ä»£åŸæ¥çš„1ç§’è½®è¯¢ï¼Œæ¶ˆé™¤å¤„ç†å»¶è¿Ÿã€‚
+            KeWaitForSingleObject(&g_PacketEvent, Executive, KernelMode, FALSE, NULL);
         }
     }
 
     ASSERT(gDriverUnloading);
 
-    KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &packetQueueLockHandle);
-    while (!IsListEmpty(&g_PacketList)) {
-        listEntry = RemoveHeadList(&g_PacketList);
+    for (;;) {
+        listEntry = NULL;
+
+        KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &packetQueueLockHandle);
+        if (!IsListEmpty(&g_PacketList)) {
+            listEntry = RemoveHeadList(&g_PacketList);
+        }
+        KeReleaseInStackQueuedSpinLock(&packetQueueLockHandle);
+
+        if (NULL == listEntry) {
+            break;
+        }
+
         packet = CONTAINING_RECORD(listEntry, PENDED_PACKET, listEntry);
-        FreePendedPacket(packet);
+        FreePendedPacket(packet);//åœ¨è‡ªæ—‹é”å¤–é‡Šæ”¾ï¼Œé¿å…æŒé”è°ƒç”¨Fwps*ä¸é‡Šæ”¾æ± ã€‚
     }
-    KeReleaseInStackQueuedSpinLock(&packetQueueLockHandle);
 
     PsTerminateSystemThread(STATUS_SUCCESS);
 }

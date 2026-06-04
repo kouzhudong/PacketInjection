@@ -1,4 +1,4 @@
-#include "wfp.h"
+ï»¿#include "wfp.h"
 #include "communication.h"
 #include "DriverEntry.h"
 #include "Auxiliary.h"
@@ -17,7 +17,7 @@ HANDLE g_Transport6_InjectionHandle;
 
 CALLOUTID g_CallOutId;
 
-LIST_ENTRY g_flowContextList;//ÓÃÓÚÊÕ¼¯ºÍ´«µİ(TCPºÍUDPµÈ)ĞÅÏ¢µÄFLOW_DATAÁ´±í.
+LIST_ENTRY g_flowContextList;//ç”¨äºæ”¶é›†å’Œä¼ é€’(TCPå’ŒUDPç­‰)ä¿¡æ¯çš„FLOW_DATAé“¾è¡¨.
 KSPIN_LOCK g_flowContextListLock;
 
 
@@ -26,9 +26,9 @@ KSPIN_LOCK g_flowContextListLock;
 
 void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PACKET packet)
 /*
-¹¦ÄÜ£º»ñÈ¡Ò»Ğ©ÍøÂçĞÅÏ¢£¬ÒÔ±ã·µ»Ø¸øÓ¦ÓÃ²ã¡£
+åŠŸèƒ½ï¼šè·å–ä¸€äº›ç½‘ç»œä¿¡æ¯ï¼Œä»¥ä¾¿è¿”å›ç»™åº”ç”¨å±‚ã€‚
 
-·²ÊÇ¸³ÖµµÄÓ¦¸Ã¶ÏÑÔÒ»Ñù¡£
+å‡¡æ˜¯èµ‹å€¼çš„åº”è¯¥æ–­è¨€ä¸€æ ·ã€‚
 */
 {
     switch (pClassifyValues->layerId) {
@@ -207,12 +207,13 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES * pClassifyValues, OUT PPENDED_PA
 }
 
 
-PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixedValues, 
+PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixedValues,
                                         _In_ const FWPS_INCOMING_METADATA_VALUES * inMetaValues,
-                                        _Inout_opt_ void * layerData
+                                        _Inout_opt_ void * layerData,
+                                        _In_opt_ PFLOW_DATA flowData
 )
 /*
-×¢Òâ£º¸ù¾İ²»Í¬µÄ×¢²á»·¾³£¨ÌØÖ¸LAYER£©£¬ÕâÀï»ñÈ¡µÄÖµÒªÓĞ²»Í¬µÄ±ä»¯¡£
+æ³¨æ„ï¼šæ ¹æ®ä¸åŒçš„æ³¨å†Œç¯å¢ƒï¼ˆç‰¹æŒ‡LAYERï¼‰ï¼Œè¿™é‡Œè·å–çš„å€¼è¦æœ‰ä¸åŒçš„å˜åŒ–ã€‚
 */
 {
     PPENDED_PACKET packet = NULL;
@@ -221,12 +222,12 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
 
     packet = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(PENDED_PACKET), TAG);
     if (NULL == packet) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "ĞÅÏ¢£º%s", "ÉêÇëÄÚ´æÊ§°Ü");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "ä¿¡æ¯ï¼š%s", "ç”³è¯·å†…å­˜å¤±è´¥");
         return packet;
     }
     RtlZeroMemory(packet, sizeof(PENDED_PACKET));
 
-    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ĞÅÏ¢£º´´½¨ DataGram packet:%p", packet);
+    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ä¿¡æ¯ï¼šåˆ›å»º DataGram packet:%p", packet);
 
     GetNetWorkInfo(inFixedValues, packet);
 
@@ -254,10 +255,12 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
             ASSERT(inMetaValues->controlDataLength > 0);
 
             packet->controlData = ExAllocatePool2(POOL_FLAG_NON_PAGED, inMetaValues->controlDataLength, TAG);
-            ASSERT(packet->controlData);
-            RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
-
-            packet->controlDataLength = inMetaValues->controlDataLength;
+            if (NULL != packet->controlData) {
+                RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
+                packet->controlDataLength = inMetaValues->controlDataLength;
+            } else {
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "åˆ†é…controlDataå¤±è´¥ï¼Œlength:%u", inMetaValues->controlDataLength);
+            }
         }
     } else {
         UINT interfaceIndexIndex = 0;
@@ -282,6 +285,20 @@ PPENDED_PACKET BuildTransportPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixe
             packet->ipSecProtected = (BOOLEAN)packetInfo.ipsecInformation.inbound.isSecure;
             packet->nblOffset = NET_BUFFER_DATA_OFFSET(NET_BUFFER_LIST_FIRST_NB(packet->NetBufferList));
         }
+    }
+
+    //ä»ALE_FLOW_ESTABLISHEDå±‚é‡‡é›†çš„è¿›ç¨‹ä¿¡æ¯ï¼Œé€šè¿‡flowContextä¼ é€’è¿‡æ¥ã€‚
+    //è¿™é‡Œå¢åŠ å¼•ç”¨ï¼Œä½¿belongingFlowä¸­çš„æŒ‡é’ˆ(processPath/sid)æŒ‡å‘è¯¥æµä¸Šä¸‹æ–‡çš„ç¼“å­˜ï¼Œ
+    //åœ¨packeté‡Šæ”¾å‰éƒ½æœ‰æ•ˆï¼Œä»è€ŒæŠŠè¿›ç¨‹ä¿¡æ¯æ­£ç¡®ä¸ŠæŠ¥ç»™ç”¨æˆ·å±‚ã€‚
+    if (flowData != NULL) {
+        InterlockedIncrement(&flowData->refCount);
+        packet->Context = flowData;
+
+        packet->belongingFlow.processPath = flowData->processPath;
+        packet->belongingFlow.size = flowData->size;
+        packet->belongingFlow.processId = flowData->processId;
+        packet->belongingFlow.sid = flowData->sid;
+        packet->belongingFlow.sidLen = flowData->sidLen;
     }
 
     for (NET_BUFFER * pNB = NET_BUFFER_LIST_FIRST_NB(packet->NetBufferList); pNB; pNB = NET_BUFFER_NEXT_NB(pNB)) {
@@ -311,7 +328,7 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
                                _Inout_ FWPS_CLASSIFY_OUT0 * pClassifyOut
 )
 {
-    //PFLOW_DATA flowData = *(PFLOW_DATA *)(UINT64 *)&flowContext;
+    PFLOW_DATA flowData = (PFLOW_DATA)flowContext;//ç”±ALE_FLOW_ESTABLISHEDå±‚å…³è”çš„ä¸Šä¸‹æ–‡ï¼Œå¯èƒ½ä¸º0ã€‚
     KLOCK_QUEUE_HANDLE lockHandle;
     FWPS_PACKET_INJECTION_STATE packetState;
     PPENDED_PACKET packet = NULL;
@@ -322,10 +339,9 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
     FWP_DIRECTION packetDirection;
 
     UNREFERENCED_PARAMETER(classifyContext);
-    UNREFERENCED_PARAMETER(flowContext);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //·Å¹ıÒ»Ğ©´¦Àí¡£
+    //æ”¾è¿‡ä¸€äº›å¤„ç†ã€‚
 
     _Analysis_assume_(layerData != NULL);
     ASSERT(layerData != NULL);
@@ -384,9 +400,9 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
     //////////////////////////////////////////////////////////////////////////////////////////////
 
      /*
-     »ñÈ¡/ÖÆ×÷Ò»¸ö½ÚµãĞÅÏ¢.
+     è·å–/åˆ¶ä½œä¸€ä¸ªèŠ‚ç‚¹ä¿¡æ¯.
      */
-    packet = BuildTransportPendPacket(pClassifyValues, pMetadata, layerData);
+    packet = BuildTransportPendPacket(pClassifyValues, pMetadata, layerData, flowData);
     if (packet == NULL) {
         pClassifyOut->actionType = FWP_ACTION_PERMIT;
         if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
@@ -398,11 +414,13 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ²åÈëÒ»¸ö½Úµã.
+    æ’å…¥ä¸€ä¸ªèŠ‚ç‚¹.
     */
     KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &lockHandle);
     InsertTailList(&g_PacketList, &packet->listEntry);
     KeReleaseInStackQueuedSpinLock(&lockHandle);
+
+    KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);//å”¤é†’å·¥ä½œçº¿ç¨‹å¤„ç†ï¼Œå–ä»£è½®è¯¢ã€‚
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -412,9 +430,35 @@ void NTAPI TransportClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValue
 }
 
 
+void ReleaseFlowData(PFLOW_DATA flowData)
+/*
+é‡Šæ”¾å¯¹FLOW_DATAçš„ä¸€ä¸ªå¼•ç”¨ã€‚å¼•ç”¨è®¡æ•°å½’ä¸º0æ—¶é‡Šæ”¾å†…å­˜ã€‚
+è°ƒç”¨æ–¹ï¼šæµè¢«åˆ é™¤ï¼ˆFlowDeleteFnå»æ‰é“¾è¡¨å¼•ç”¨ï¼‰å’Œç¼“å­˜ä¿¡æ¯çš„æ¯ä¸ªpended packetï¼ˆFreePendedPacketï¼‰ã€‚
+æ³¨æ„ï¼šå¿…é¡»ç”¨InterlockedDecrementçš„è¿”å›å€¼åˆ¤0ï¼Œä¸å¯â€œå…ˆå‡å†è¯»â€ï¼Œå¦åˆ™ä¸æ˜¯åŸå­çš„ã€‚
+*/
+{
+    if (NULL == flowData) {
+        return;
+    }
+
+    ASSERT(flowData->refCount > 0);
+    if (0 == InterlockedDecrement(&flowData->refCount)) {
+        if (NULL != flowData->sid) {
+            ExFreePoolWithTag(flowData->sid, TAG);
+        }
+        if (NULL != flowData->processPath) {
+            ExFreePoolWithTag(flowData->processPath, TAG);
+        }
+        ExFreePoolWithTag(flowData, TAG);
+
+        //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "è·Ÿè¸ªä¿¡æ¯ï¼šé‡Šæ”¾ä¸Šä¸‹æ–‡:%p", flowData);
+    }
+}
+
+
 VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowContext)
 {
-    PFLOW_DATA flowData = *(PFLOW_DATA *)(UINT64 *)&flowContext;
+    PFLOW_DATA flowData = (PFLOW_DATA)flowContext;
     KLOCK_QUEUE_HANDLE lockHandle;
 
     UNREFERENCED_PARAMETER(layerId);
@@ -422,22 +466,11 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 
     KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
     if (!flowData->deleting) {
-        RemoveEntryList(&flowData->listEntry);//Õâ¸öÁ´±í¾¹È»³öÎÊÌâ¡£²é¿´deleting³ÉÔ±µÄÖµ¡£    
+        RemoveEntryList(&flowData->listEntry);//è¿™ä¸ªé“¾è¡¨ç«Ÿç„¶å‡ºé—®é¢˜ã€‚æŸ¥çœ‹deletingæˆå‘˜çš„å€¼ã€‚
     }
     KeReleaseInStackQueuedSpinLock(&lockHandle);
 
-    ASSERT(flowData->refCount > 0);
-    InterlockedDecrement(&flowData->refCount);
-
-    if (flowData->refCount == 0) {
-
-        ExFreePoolWithTag(flowData->sid, TAG);
-        ExFreePoolWithTag(flowData->processPath, TAG);
-
-        ExFreePoolWithTag(flowData, TAG);
-
-        //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "¸ú×ÙĞÅÏ¢£ºÊÍ·ÅÉÏÏÂÎÄ:%p", flowData);
-    }
+    ReleaseFlowData(flowData);//é‡Šæ”¾é“¾è¡¨å¼•ç”¨ï¼›è‹¥ä»æœ‰pended packetå¼•ç”¨ï¼Œæœ€åä¸€ä¸ªå†é‡Šæ”¾ã€‚
 }
 
 
@@ -462,18 +495,22 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
         return;
     }
 
-    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContextµ÷ÓÃ³É¹¦ÁË²»ÊÍ·Å¡£
-    ASSERT(fc);
-    RtlZeroMemory(fc, sizeof(FLOW_DATA));
+    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//ExAllocatePool2é»˜è®¤æ¸…é›¶ã€‚
+    if (NULL == fc) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "%s", "åˆ†é…FLOW_DATAå¤±è´¥");
+        return;
+    }
 
-    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "¸ú×ÙĞÅÏ¢£ºÉêÇëÉÏÏÂÎÄ:%p", fc);
+    fc->refCount = 1;//é“¾è¡¨å¼•ç”¨ã€‚ç½®äºæ­¤åä»»ä½•å¤±è´¥è·¯å¾„éƒ½å¯é€šè¿‡ReleaseFlowDataç»Ÿä¸€é‡Šæ”¾ã€‚
+
+    //PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "è·Ÿè¸ªä¿¡æ¯ï¼šç”³è¯·ä¸Šä¸‹æ–‡:%p", fc);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ÕâÈı¸ö±ØĞëÉèÖÃ£¬ÔÚÇı¶¯Ğ¶ÔØµÄÊ±ºò£¬µ÷ÓÃRemoveFlowsº¯Êı£¬ĞèÒªÕâÈı¸ö²ÎÊı¡£
-    ·ñÕß£¬¼´Ê¹Çı¶¯Ğ¶ÔØ³É¹¦£¬Çı¶¯ÔÙ´Î¼ÓÔØ»áÊ§°Ü¡£
-    ÕâÒ²ÊÇFwpsCalloutUnregisterById·µ»ØSTATUS_DEVICE_BUSYµÄÔ­Òò¡£
+    è¿™ä¸‰ä¸ªå¿…é¡»è®¾ç½®ï¼Œåœ¨é©±åŠ¨å¸è½½çš„æ—¶å€™ï¼Œè°ƒç”¨RemoveFlowså‡½æ•°ï¼Œéœ€è¦è¿™ä¸‰ä¸ªå‚æ•°ã€‚
+    å¦è€…ï¼Œå³ä½¿é©±åŠ¨å¸è½½æˆåŠŸï¼Œé©±åŠ¨å†æ¬¡åŠ è½½ä¼šå¤±è´¥ã€‚
+    è¿™ä¹Ÿæ˜¯FwpsCalloutUnregisterByIdè¿”å›STATUS_DEVICE_BUSYçš„åŸå› ã€‚
     */
     fc->flowHandle = pMetadata->flowHandle;
     fc->calloutId = calloutId;
@@ -486,10 +523,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
     {
         fc->addressFamily = AF_INET;
 
-        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_PROTOCOL].value.uint16;
+        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_PROTOCOL].value.uint8;
 
         fc->SourceIp.addressFamily = AF_INET;
-        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//·µ»ØÖµµÄÀàĞÍÊÇNL_ADDRESS_TYPE
+        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//è¿”å›å€¼çš„ç±»å‹æ˜¯NL_ADDRESS_TYPE
 
         fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS].value.uint32;
 
@@ -518,10 +555,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
 
         fc->addressFamily = AF_INET6;
 
-        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_PROTOCOL].value.uint16;
+        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_PROTOCOL].value.uint8;
 
         fc->SourceIp.addressFamily = AF_INET6;
-        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//·µ»ØÖµµÄÀàĞÍÊÇNL_ADDRESS_TYPE
+        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//è¿”å›å€¼çš„ç±»å‹æ˜¯NL_ADDRESS_TYPE
 
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
@@ -551,10 +588,14 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //¶îÍâ/¸¨ÖúĞÅÏ¢ÌîĞ´¡£
+    //é¢å¤–/è¾…åŠ©ä¿¡æ¯å¡«å†™ã€‚
 
     fc->processPath = (WCHAR *)ExAllocatePool2(POOL_FLAG_NON_PAGED, pMetadata->processPath->size, TAG);
-    ASSERT(fc->processPath);
+    if (NULL == fc->processPath) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "åˆ†é…processPathå¤±è´¥ï¼Œsize:%u", pMetadata->processPath->size);
+        ReleaseFlowData(fc);
+        return;
+    }
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
 
@@ -563,18 +604,20 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
         fc->sid = (SID *)ExAllocatePool2(POOL_FLAG_NON_PAGED, fc->sidLen, TAG);
-        ASSERT(fc->sid);
+        if (NULL == fc->sid) {
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "åˆ†é…sidå¤±è´¥ï¼ŒsidLen:%lu", fc->sidLen);
+            ReleaseFlowData(fc);
+            return;
+        }
         memcpy(fc->sid, sid, fc->sidLen);
     }
 
-    fc->refCount = 1;
-
-    //////////////////////////////////////////////////////////////////////////////////////////////    
+    //////////////////////////////////////////////////////////////////////////////////////////////
 
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "´íÎó£ºstatus:%#x, CalloutId:%x", status, calloutId);
-        ExFreePoolWithTag(fc, TAG);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "é”™è¯¯ï¼šstatus:%#x, CalloutId:%x", status, calloutId);
+        ReleaseFlowData(fc);//é‡Šæ”¾fcï¼ŒåŒ…æ‹¬processPathå’Œsidã€‚
         return;
     }
 
@@ -598,13 +641,20 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(layerData);
 
-    ASSERT(pMetadata->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID);
-    ASSERT(pMetadata->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_PATH);
-    ASSERT(pMetadata->processPath->size);
+    //è¿›ç¨‹ä¿¡æ¯å¿…é¡»å¯ç”¨ï¼ŒAssociateOneContextä¼šè¯»å–processPath->size/dataï¼Œç¼ºå¤±åˆ™PERMITè¿”å›ã€‚
+    if (!FWPS_IS_METADATA_FIELD_PRESENT(pMetadata, FWPS_METADATA_FIELD_PROCESS_PATH) ||
+        NULL == pMetadata->processPath ||
+        0 == pMetadata->processPath->size) {
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        if (pFilter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+            pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        }
+        return;
+    }
 
     /*
-    ¿ÉÒÔ¿¼ÂÇ¶ÔÒ»¸öÊı×é½øĞĞ±éÀú½øĞĞÌí¼ÓÉÏÏÂÎÄ£¬ÕâÑùÓÖ¿ÉĞ´Ò»¸öº¯Êı£¬ÕâÑùÓÖ¼òµ¥ÁË¡£
-    µ«ÊÇ£¬ÕâÑù¿ÉÄÜ»áÓĞ¶àÓàµÄºÍÎŞÓÃµÄÉÏÏÂÎÄ¡£
+    å¯ä»¥è€ƒè™‘å¯¹ä¸€ä¸ªæ•°ç»„è¿›è¡Œéå†è¿›è¡Œæ·»åŠ ä¸Šä¸‹æ–‡ï¼Œè¿™æ ·åˆå¯å†™ä¸€ä¸ªå‡½æ•°ï¼Œè¿™æ ·åˆç®€å•äº†ã€‚
+    ä½†æ˜¯ï¼Œè¿™æ ·å¯èƒ½ä¼šæœ‰å¤šä½™çš„å’Œæ— ç”¨çš„ä¸Šä¸‹æ–‡ã€‚
     */
     switch (pClassifyValues->layerId) {
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4:
@@ -612,16 +662,16 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V4, g_CallOutId.INBOUND_TRANSPORT_V4);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V4, g_CallOutId.OUTBOUND_TRANSPORT_V4);
 
-        //¿É¼ÌĞøÌí¼Ó.
+        //å¯ç»§ç»­æ·»åŠ .
 
         break;
-    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD://¿´¿´×ßµ½ÕâÀï¹ıÃ»£¿
+    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD://çœ‹çœ‹èµ°åˆ°è¿™é‡Œè¿‡æ²¡ï¼Ÿ
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4_DISCARD, g_CallOutId.DATAGRAM_DATA_V4_DISCARD);
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V4_DISCARD, g_CallOutId.STREAM_V4_DISCARD);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V4);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V4);
 
-        //¿É¼ÌĞøÌí¼Ó.
+        //å¯ç»§ç»­æ·»åŠ .
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6:
@@ -629,16 +679,16 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V6, g_CallOutId.INBOUND_TRANSPORT_V6);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V6, g_CallOutId.OUTBOUND_TRANSPORT_V6);
 
-        //¿É¼ÌĞøÌí¼Ó.
+        //å¯ç»§ç»­æ·»åŠ .
 
         break;
-    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD://¿´¿´×ßµ½ÕâÀï¹ıÃ»£¿
+    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD://çœ‹çœ‹èµ°åˆ°è¿™é‡Œè¿‡æ²¡ï¼Ÿ
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6_DISCARD, g_CallOutId.DATAGRAM_DATA_V6_DISCARD);
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V6_DISCARD, g_CallOutId.STREAM_V6_DISCARD);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_INBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.INBOUND_TRANSPORT_DISCARD_V6);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD, g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V6);
 
-        //¿É¼ÌĞøÌí¼Ó.
+        //å¯ç»§ç»­æ·»åŠ .
 
         break;
     default:
@@ -672,11 +722,11 @@ VOID RemoveFlows()
 
         flowContext->deleting = TRUE; // We don't want our flow deletion function to try to remove this from the list.        
         KeReleaseInStackQueuedSpinLock(&lockHandle);
-        status = FwpsFlowRemoveContext(flowContext->flowHandle, flowContext->layerId, flowContext->calloutId);//»á¼ä½Óµ÷ÓÃFlowDeleteFn¡£
+        status = FwpsFlowRemoveContext(flowContext->flowHandle, flowContext->layerId, flowContext->calloutId);//ä¼šé—´æ¥è°ƒç”¨FlowDeleteFnã€‚
         KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
         if (!NT_SUCCESS(status)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                    "´íÎó£ºstatus:%#x, flowHandle:%I64d, layerId:%#x, calloutId:%#x",
+                    "é”™è¯¯ï¼šstatus:%#x, flowHandle:%I64d, layerId:%#x, calloutId:%#x",
                     status, flowContext->flowHandle,
                     flowContext->layerId,
                     flowContext->calloutId);
@@ -688,7 +738,7 @@ VOID RemoveFlows()
 
 void UnregisterAllCalloutId()
 /*
-¿¼ÂÇÓÃÒ»¸öforÑ­»·ÊµÏÖ.
+è€ƒè™‘ç”¨ä¸€ä¸ªforå¾ªç¯å®ç°.
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -701,13 +751,10 @@ void UnregisterAllCalloutId()
             NtStatus = FwpsCalloutUnregisterById(temp[i]);
             if (!NT_SUCCESS(NtStatus)) {
                 PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                        "´íÎó£ºi:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
+                        "é”™è¯¯ï¼ši:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
             }
 
-            /*
-            ²»ÒªÖÃÁã,±ğ´¦,Èç:FreePendedPacket»¹ÓĞ¿ÉÄÜÓÃÕâ¸öÊı.Õâ¸öÓĞ´ıÍêÉÆ.
-            */
-            //temp[i] = 0;
+            temp[i] = 0;//ç½®é›¶ï¼Œä½¿StopWFPå¯è¢«é‡å¤è°ƒç”¨ï¼ˆå¤±è´¥è·¯å¾„ + å¸è½½å‡ä¼šé—´æ¥è°ƒç”¨ï¼‰ã€‚RemoveFlowsç”¨çš„æ˜¯æ¯ä¸ªflowè‡ªå·±ä¿å­˜çš„calloutIdï¼Œä¸ä¾èµ–æ­¤idã€‚
         }
     }
 }
@@ -720,7 +767,7 @@ void ShowCalloutId()
     PUINT32 temp = (PUINT32)&g_CallOutId;
 
     for (; i < counter; i++) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ĞÅÏ¢£ºi:%d, id:%#x", i, temp[i]);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "ä¿¡æ¯ï¼ši:%d, id:%#x", i, temp[i]);
     }
 }
 
@@ -752,10 +799,18 @@ void StopWFP()
     InterlockedIncrement(&gDriverUnloading);
     KeReleaseInStackQueuedSpinLock(&flowListLockHandle);
 
-    status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
-    ASSERT(NT_SUCCESS(status));
-    status = FwpmEngineClose(g_EngineHandle);
-    ASSERT(NT_SUCCESS(status));
+    //åªæœ‰è®¢é˜…äº†æ‰é€€è®¢ï¼šç³»ç»Ÿå¯åŠ¨åBFEå·²è¿è¡Œæ—¶ï¼ŒStartWFPç›´æ¥æ³¨å†Œï¼Œå¹¶æ²¡æœ‰è®¢é˜…ï¼Œg_ChangeHandleä¸ºNULLã€‚
+    if (NULL != g_ChangeHandle) {
+        status = FwpmBfeStateUnsubscribeChanges(g_ChangeHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_ChangeHandle = NULL;
+    }
+
+    if (NULL != g_EngineHandle) {
+        status = FwpmEngineClose(g_EngineHandle);
+        ASSERT(NT_SUCCESS(status));
+        g_EngineHandle = NULL;
+    }
 
     RemoveFlows();
 
@@ -775,21 +830,21 @@ NTSTATUS RegisterCallout(__in GUID SystemlayerKey,
                          __in_opt FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0 FlowDeleteFn
 )
 /*
-×¢²áÍøÂç´¦Àí¡£
+æ³¨å†Œç½‘ç»œå¤„ç†ã€‚
 
-µ«£¬²»°üº¬£º
-1.¹ıÂËµÄÌõ¼ş¡£
-2.¹ıÂËµÄ·Ö²ãÎªFWPM_SUBLAYER_UNIVERSAL¡£
-3.CalloutµÄdisplayDataµÄÃû×ÖºÍÃèÊö¡£
-4.FilterµÄdisplayDataµÄÃû×ÖºÍÃèÊö¡£
-5.FWPS_CALLOUTµÄflagsµÄÉèÖÃ¡£
-6.FWPM_CALLOUTµÄflagsµÄÉèÖÃ¡£
-7.FWPM_FILTERÀïµÄ¸÷ÖÖ¸ü¼ÓÏêÏ¸ºÍ¾«È·µÄÉèÖÃ¡£
-ËùÒÔÒª¸ù¾İĞèÒª£¬Ñ¡ÔñÊÇ·ñÊ¹ÓÃÕâ¸öº¯Êı¡£
-²»¹ıÕâ¸öº¯ÊıÒ²ÓĞÒ»¶¨µÄÍ¨ÓÃĞÔ£¬¼´×¢²á´ó¶à³É¹¦£¬µ«ÊÇÄÚÈİÌ«¶à£¬ĞèÒªÔÚ´¦Àíº¯ÊıÖĞ¹ıÂË¡£
+ä½†ï¼Œä¸åŒ…å«ï¼š
+1.è¿‡æ»¤çš„æ¡ä»¶ã€‚
+2.è¿‡æ»¤çš„åˆ†å±‚ä¸ºFWPM_SUBLAYER_UNIVERSALã€‚
+3.Calloutçš„displayDataçš„åå­—å’Œæè¿°ã€‚
+4.Filterçš„displayDataçš„åå­—å’Œæè¿°ã€‚
+5.FWPS_CALLOUTçš„flagsçš„è®¾ç½®ã€‚
+6.FWPM_CALLOUTçš„flagsçš„è®¾ç½®ã€‚
+7.FWPM_FILTERé‡Œçš„å„ç§æ›´åŠ è¯¦ç»†å’Œç²¾ç¡®çš„è®¾ç½®ã€‚
+æ‰€ä»¥è¦æ ¹æ®éœ€è¦ï¼Œé€‰æ‹©æ˜¯å¦ä½¿ç”¨è¿™ä¸ªå‡½æ•°ã€‚
+ä¸è¿‡è¿™ä¸ªå‡½æ•°ä¹Ÿæœ‰ä¸€å®šçš„é€šç”¨æ€§ï¼Œå³æ³¨å†Œå¤§å¤šæˆåŠŸï¼Œä½†æ˜¯å†…å®¹å¤ªå¤šï¼Œéœ€è¦åœ¨å¤„ç†å‡½æ•°ä¸­è¿‡æ»¤ã€‚
 
-²ÎÊı£º
-FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁªÉÏÏÂÎÄµÄ²Ù×÷Ã»ÓĞÕâ¸ö£¬ÒòÎªËü×ÔÉíÃ»ÓĞÉÏÏÂÎÄ¡£
+å‚æ•°ï¼š
+FlowDeleteFn åœ¨æ²¡æœ‰éœ€è¦ä¸Šä¸‹æ–‡ï¼Œæˆ–è€…ä¸Šä¸‹æ–‡æ³¨å†Œå¤±è´¥çš„æƒ…å†µä¸‹ï¼Œå¯ä»¥ä¸è¦è¿™ä¸ªã€‚ä¸“é—¨å…³è”ä¸Šä¸‹æ–‡çš„æ“ä½œæ²¡æœ‰è¿™ä¸ªï¼Œå› ä¸ºå®ƒè‡ªèº«æ²¡æœ‰ä¸Šä¸‹æ–‡ã€‚
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -801,13 +856,13 @@ FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁ
 
     NtStatus = ExUuidCreate(&MyCalloutKey);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         return NtStatus;
     }
 
     /*
-    ¿ÉÒÔ¿¼ÂÇÓÃRtlStringFromGUID°ÑGUID×ª»»Îª×Ö·û´®£¬È»ºó¸´ÖÆ¸øÏàÓ¦µÄ³ÉÔ±£¬ÒÔÌæ»»test×Ö·û´®¡£
-    »òÕß°ÑSystemlayerKeyÒ²×ª»»Îª×Ö·û´®£¬È»ºóºÍÉÏÃæµÄ×Ö·û´®Æ´½Ó£¬È»ºó¸³Öµ£¬ÒÔÌæ»»test×Ö·û´®¡£
+    å¯ä»¥è€ƒè™‘ç”¨RtlStringFromGUIDæŠŠGUIDè½¬æ¢ä¸ºå­—ç¬¦ä¸²ï¼Œç„¶åå¤åˆ¶ç»™ç›¸åº”çš„æˆå‘˜ï¼Œä»¥æ›¿æ¢testå­—ç¬¦ä¸²ã€‚
+    æˆ–è€…æŠŠSystemlayerKeyä¹Ÿè½¬æ¢ä¸ºå­—ç¬¦ä¸²ï¼Œç„¶åå’Œä¸Šé¢çš„å­—ç¬¦ä¸²æ‹¼æ¥ï¼Œç„¶åèµ‹å€¼ï¼Œä»¥æ›¿æ¢testå­—ç¬¦ä¸²ã€‚
     */
 
     sCallout.calloutKey = MyCalloutKey;
@@ -816,7 +871,7 @@ FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁ
     sCallout.flowDeleteFn = FlowDeleteFn;
     NtStatus = FwpsCalloutRegister1(g_deviceObject, &sCallout, MyCalloutId);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         return NtStatus;
     }
 
@@ -828,7 +883,7 @@ FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁ
         mCallout.applicableLayer = SystemlayerKey;
         NtStatus = FwpmCalloutAdd(g_EngineHandle, &mCallout, NULL, NULL);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
             __leave;
         }
 
@@ -840,7 +895,7 @@ FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁ
         filter.subLayerKey = FWPM_SUBLAYER_UNIVERSAL;
         NtStatus = FwpmFilterAdd(g_EngineHandle, &filter, NULL, NULL);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
             __leave;
         }
     } __finally {
@@ -856,8 +911,8 @@ FlowDeleteFn ÔÚÃ»ÓĞĞèÒªÉÏÏÂÎÄ£¬»òÕßÉÏÏÂÎÄ×¢²áÊ§°ÜµÄÇé¿öÏÂ£¬¿ÉÒÔ²»ÒªÕâ¸ö¡£×¨ÃÅ¹ØÁ
 
 NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
 /*
-¿ÉÒÔ¿¼ÂÇÏñminifilterÄÇÑù£¬×¢²á¸öÊı¾İ½á¹¹µÄÊı×éÀ´×¢²á¡£
-Õâ¸öº¯ÊıÀàËÆÓëFltRegisterFilterµÄ¹¦ÄÜ£¬Ãû×Ö¶¼½ĞFwpsCalloutRegisterFilter»òÕßFwpmCalloutRegisterFilter.
+å¯ä»¥è€ƒè™‘åƒminifilteré‚£æ ·ï¼Œæ³¨å†Œä¸ªæ•°æ®ç»“æ„çš„æ•°ç»„æ¥æ³¨å†Œã€‚
+è¿™ä¸ªå‡½æ•°ç±»ä¼¼ä¸FltRegisterFilterçš„åŠŸèƒ½ï¼Œåå­—éƒ½å«FwpsCalloutRegisterFilteræˆ–è€…FwpmCalloutRegisterFilter.
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -874,7 +929,7 @@ NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
                                    Registration[i].NotifyFn,
                                    Registration[i].FlowDeleteFn);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºi:%d, status:%#x", i, NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼ši:%d, status:%#x", i, NtStatus);
             break;
         }
     }
@@ -884,17 +939,17 @@ NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
 
 
 /*
-GUID±ØĞë¶¨ÒåÎªÖ¸Õë£¬·ñÕß£¬³öÏÖ¸÷ÖÖÎÊÌâ¡£
+GUIDå¿…é¡»å®šä¹‰ä¸ºæŒ‡é’ˆï¼Œå¦è€…ï¼Œå‡ºç°å„ç§é—®é¢˜ã€‚
 */
 CALLOUT_FILTER g_CalloutFilter[] =
 {
-    //½¨ÒéÏÈ×¢²áÕâËÄ¸ö£¬ºóÃæÁ½¸öÒ²½¨Òé¼ÓÉÏ£¬Õâ¸öµÄ×îºóÒ»¸öÊÇNULL¡£
+    //å»ºè®®å…ˆæ³¨å†Œè¿™å››ä¸ªï¼Œåé¢ä¸¤ä¸ªä¹Ÿå»ºè®®åŠ ä¸Šï¼Œè¿™ä¸ªçš„æœ€åä¸€ä¸ªæ˜¯NULLã€‚
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4,           &g_CallOutId.EstablishedId4,                EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6,           &g_CallOutId.EstablishedId6,                EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD,   &g_CallOutId.EstablishedId4_DISCARD,        EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD,   &g_CallOutId.EstablishedId6_DISCARD,        EstablishedClassifyFn,  NotifyFn,   0},
 
-    //×¢²áTRANSPORTÏà¹ØµÄ´¦Àí¡£
+    //æ³¨å†ŒTRANSPORTç›¸å…³çš„å¤„ç†ã€‚
     {&FWPM_LAYER_INBOUND_TRANSPORT_V4,              &g_CallOutId.INBOUND_TRANSPORT_V4,          TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
     {&FWPM_LAYER_INBOUND_TRANSPORT_V6,              &g_CallOutId.INBOUND_TRANSPORT_V6,          TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
     {&FWPM_LAYER_OUTBOUND_TRANSPORT_V4,             &g_CallOutId.OUTBOUND_TRANSPORT_V4,         TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
@@ -904,16 +959,16 @@ CALLOUT_FILTER g_CalloutFilter[] =
     //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V4_DISCARD,     &g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V4, TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_OUTBOUND_TRANSPORT_V6_DISCARD,     &g_CallOutId.OUTBOUND_TRANSPORT_DISCARD_V6, TransportClassifyFn,  NotifyFn,   FlowDeleteFn},
 
-    //×¢²áDATAGRAM_DATAÏà¹ØµÄ´¦Àí¡£
+    //æ³¨å†ŒDATAGRAM_DATAç›¸å…³çš„å¤„ç†ã€‚
     //{&FWPM_LAYER_DATAGRAM_DATA_V4,             &g_CallOutId.DATAGRAM_DATA_V4,         DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V4_DISCARD,     &g_CallOutId.DATAGRAM_DATA_V4_DISCARD, DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V6,             &g_CallOutId.DATAGRAM_DATA_V6,         DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V6_DISCARD,     &g_CallOutId.DATAGRAM_DATA_V6_DISCARD, DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
 
-    //»¹¿ÉÒÔ¼ÌĞøÌí¼Ó¡£
+    //è¿˜å¯ä»¥ç»§ç»­æ·»åŠ ã€‚
     //...
 
-    //±ØĞëÒÔÕâ¸ö½áÎ²¡£
+    //å¿…é¡»ä»¥è¿™ä¸ªç»“å°¾ã€‚
     {&NULL_GUID, 0, NULL, NULL, NULL}
 };
 
@@ -924,13 +979,13 @@ NTSTATUS CreateInjectionHandle()
 
     NtStatus = FwpsInjectionHandleCreate(AF_INET, FWPS_INJECTION_TYPE_TRANSPORT, &g_Transport4_InjectionHandle);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         return NtStatus;
     }
 
     NtStatus = FwpsInjectionHandleCreate(AF_INET6, FWPS_INJECTION_TYPE_TRANSPORT, &g_Transport6_InjectionHandle);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         return NtStatus;
     }
 
@@ -946,13 +1001,13 @@ NTSTATUS RegisterCallouts()
     session.flags = FWPM_SESSION_FLAG_DYNAMIC;
     NtStatus = FwpmEngineOpen(NULL, RPC_C_AUTHN_WINNT, NULL, &session, &g_EngineHandle);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         return NtStatus;
     }
 
     NtStatus = FwpmTransactionBegin(g_EngineHandle, 0);
     if (!NT_SUCCESS(NtStatus)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
         FwpmEngineClose(g_EngineHandle);
         return NtStatus;
     }
@@ -965,13 +1020,13 @@ NTSTATUS RegisterCallouts()
 
         NtStatus = FwpsCalloutRegisterFilter(g_CalloutFilter);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
             __leave;
         }
 
         NtStatus = FwpmTransactionCommit(g_EngineHandle);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
             __leave;
         }
     } __finally {
@@ -993,9 +1048,9 @@ VOID NTAPI SubscriptionBFEStateChangeCallback(IN OUT void * context, IN FWPM_SER
 /*
 Purpose:  Callback, invoked on BFE service state change, which will get or release a handle to the engine.
 MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
-²âÊÔĞÄµÃ£º
-1.²Ù×÷ÏµÍ³Æô¶¯µÄÊ±ºòÏÈÀ´ FWPM_SERVICE_START_PENDING £¬ºóÀ´ FWPM_SERVICE_RUNNING ¡£
-2.Õı³£µÄÆô¶¯ÊÇ²»»á×ßÕâÀïµÄ¡£
+æµ‹è¯•å¿ƒå¾—ï¼š
+1.æ“ä½œç³»ç»Ÿå¯åŠ¨çš„æ—¶å€™å…ˆæ¥ FWPM_SERVICE_START_PENDING ï¼Œåæ¥ FWPM_SERVICE_RUNNING ã€‚
+2.æ­£å¸¸çš„å¯åŠ¨æ˜¯ä¸ä¼šèµ°è¿™é‡Œçš„ã€‚
 */
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -1004,16 +1059,16 @@ MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
 
     switch (newState) {
     case FWPM_SERVICE_RUNNING:
-        //µ÷ÓÃFwpmEngineOpen»ñÈ¡EngineHandle¡£
+        //è°ƒç”¨FwpmEngineOpenè·å–EngineHandleã€‚
         status = RegisterCallouts();
         break;
     case FWPM_SERVICE_STOP_PENDING:
-        //Òª×ßÕâÀï£¬»¹µÃ×öÒ»Ğ©Ğ¡¶¯×÷¡£
-        //µ÷ÓÃFwpmEngineCloseÊÍ·ÅEngineHandle¡£
+        //è¦èµ°è¿™é‡Œï¼Œè¿˜å¾—åšä¸€äº›å°åŠ¨ä½œã€‚
+        //è°ƒç”¨FwpmEngineCloseé‡Šæ”¾EngineHandleã€‚
         break;
-    case FWPM_SERVICE_STOPPED://ÏµÍ³Æô¶¯µÄÊ±ºò»áÊÇÕâ¸ö¡£
+    case FWPM_SERVICE_STOPPED://ç³»ç»Ÿå¯åŠ¨çš„æ—¶å€™ä¼šæ˜¯è¿™ä¸ªã€‚
         break;
-    case FWPM_SERVICE_START_PENDING://²Ù×÷ÏµÍ³Æô¶¯µÄÊ±ºò»áÓĞÕâ¸ö¡£ 
+    case FWPM_SERVICE_START_PENDING://æ“ä½œç³»ç»Ÿå¯åŠ¨çš„æ—¶å€™ä¼šæœ‰è¿™ä¸ªã€‚ 
         break;
     default:
         break;
@@ -1024,14 +1079,14 @@ MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
 NTSTATUS StartWFP()
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
-    FWPM_SERVICE_STATE BfeState = FwpmBfeStateGet();//Õâ¸ö¿ÉÅĞ¶ÏÇı¶¯ÊÇ·ñÔÚÏµÍ³µÄÆô¶¯×´Ì¬¡£
+    FWPM_SERVICE_STATE BfeState = FwpmBfeStateGet();//è¿™ä¸ªå¯åˆ¤æ–­é©±åŠ¨æ˜¯å¦åœ¨ç³»ç»Ÿçš„å¯åŠ¨çŠ¶æ€ã€‚
 
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
     } else {
         NtStatus = FwpmBfeStateSubscribeChanges(g_deviceObject, SubscriptionBFEStateChangeCallback, NULL, &g_ChangeHandle);
         if (!NT_SUCCESS(NtStatus)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", NtStatus);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", NtStatus);
             return NtStatus;
         }
     }

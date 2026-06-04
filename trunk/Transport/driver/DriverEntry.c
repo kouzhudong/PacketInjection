@@ -1,4 +1,4 @@
-#include "DriverEntry.h"
+﻿#include "DriverEntry.h"
 #include "communication.h"
 #include "wfp.h"
 #include "SystemThread.h"
@@ -11,7 +11,7 @@
 UNICODE_STRING g_SymbolicLinkName = RTL_CONSTANT_STRING(L"\\DosDevices\\Inject");
 UNICODE_STRING g_DeviceName = RTL_CONSTANT_STRING(L"\\Device\\Inject");
 
-LONG gDriverUnloading = FALSE;//ΪTRUEʱ�Ͳ��ٽ��ܸ�����Ϣ��
+LONG gDriverUnloading = FALSE;//为TRUE时就不再接受各个消息了
 
 PDEVICE_OBJECT g_deviceObject;
 
@@ -32,8 +32,8 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
 /*
-����֣���ʾж�سɹ��ˣ���������ģ�黹���ڴ��У������ٴ�����������ʧ�ܡ�
-ͬʱ������ļ���Windows 10��Ҳɾ�������������Ը�����
+会出现：显示卸载成功了，但是驱动模块还在内存中，所以再次启动会启动失败。
+同时，这个文件在Windows 10上也删除不掉，但可以改名。
 */
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -44,28 +44,27 @@ VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
     UNREFERENCED_PARAMETER(DriverObject);
 
     InterlockedIncrement(&gDriverUnloading);
+    KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);//唤醒等待中的工作线程，使其退出。
 
-    Unload(0);
-
-    StopWFP();
-
+    //先等工作线程退出，确保没有线程还在IsBlockPacker的FltSendMessage里使用g_Data.Filter，
+    //之后再拆WFP和通信端，否则worker会使用已释放的filter，造成use-after-free。
     ThreadNumbers = 1;
     status = KeWaitForMultipleObjects(ThreadNumbers, gThreadObj, WaitAll, Executive, KernelMode, FALSE, NULL, &g_WaitBlockArray[0]);
     switch (status) {
     case STATUS_SUCCESS:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "��Ϣ��KeWaitForMultipleObjects %s", "STATUS_SUCCESS");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "信息：KeWaitForMultipleObjects %s", "STATUS_SUCCESS");
         break;
     case STATUS_ALERTED:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "���棺KeWaitForMultipleObjects  %s", "STATUS_ALERTED");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "警告：KeWaitForMultipleObjects  %s", "STATUS_ALERTED");
         break;
     case STATUS_USER_APC:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "���棺KeWaitForMultipleObjects  %s", "STATUS_USER_APC");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "警告：KeWaitForMultipleObjects  %s", "STATUS_USER_APC");
         break;
     case STATUS_TIMEOUT:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "���棺KeWaitForMultipleObjects  %s", "STATUS_TIMEOUT");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "警告：KeWaitForMultipleObjects  %s", "STATUS_TIMEOUT");
         break;
     default:
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "����status:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
         break;
     }
 
@@ -74,6 +73,9 @@ VOID DriverUnload(_In_ struct _DRIVER_OBJECT * DriverObject)
             ObDereferenceObject(gThreadObj[i]);
         }
     }
+
+    StopWFP();//注销callout、移除flow、销毁注入句柄。此时worker已退出，安全。
+    Unload(0);//注销进程回调、关闭通信端、注销过滤器。此时worker不再使用filter，消除竞态。
 
     IoDeleteSymbolicLink(&g_SymbolicLinkName);
     IoDeleteDevice(g_deviceObject);
@@ -104,11 +106,12 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
 
     InitializeListHead(&g_PacketList);
     KeInitializeSpinLock(&g_PacketListLock);
+    KeInitializeEvent(&g_PacketEvent, SynchronizationEvent, FALSE);//工作线程的包到达信号，必须在注册回调前初始化。
 
     InitializeListHead(&g_flowContextList);
     KeInitializeSpinLock(&g_flowContextListLock);
 
-    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "��Ϣ��FUNCTION:%ls", _CRT_WIDE(__FUNCTION__));
+    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "信息：FUNCTION:%ls", _CRT_WIDE(__FUNCTION__));
 
     __try {
         status = IoCreateDevice(pDriverObject,
@@ -116,16 +119,16 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
                                 &g_DeviceName,
                                 FILE_DEVICE_UNKNOWN,
                                 FILE_DEVICE_SECURE_OPEN,
-                                TRUE,/*��ռʽ�豸,ͬһʱ��ֻ��һ������򿪴��豸*/
+                                TRUE,/*独占式设备,同一时刻只有一个句柄打开此设备*/
                                 &g_deviceObject);
         if (!NT_SUCCESS(status)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "����status:%#x", status);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "错误：status:%#x", status);
             __leave;
         }
 
         status = IoCreateSymbolicLink(&g_SymbolicLinkName, &g_DeviceName);
         if (!NT_SUCCESS(status)) {
-            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "����status:%#x", status);
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "错误：status:%#x", status);
             __leave;
         }
 
@@ -148,13 +151,34 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
         ThreadNumbers = 1;
         for (CCHAR i = 0; i < ThreadNumbers; i++) {
             status = PsCreateSystemThread(&threadHandle, THREAD_ALL_ACCESS, NULL, NULL, NULL, WorkThread, NULL);
-            ASSERT(NT_SUCCESS(status));
+            if (!NT_SUCCESS(status)) {
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "PsCreateSystemThread status:%#x", status);
+                __leave;
+            }
             status = ObReferenceObjectByHandle(threadHandle, 0, NULL, KernelMode, &gThreadObj[i], NULL);
-            ASSERT(NT_SUCCESS(status));
             ZwClose(threadHandle);
+            if (!NT_SUCCESS(status)) {
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "ObReferenceObjectByHandle status:%#x", status);
+                gThreadObj[i] = NULL;
+                __leave;
+            }
         }
     } __finally {
         if (!NT_SUCCESS(status)) {
+            //终止可能已创建的工作线程并等待其退出，防止驱动卸载后线程仍在运行。
+            InterlockedIncrement(&gDriverUnloading);
+            KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);
+            for (CCHAR i = 0; i < ThreadNumbers; i++) {
+                if (NULL != gThreadObj[i]) {
+                    KeWaitForSingleObject(gThreadObj[i], Executive, KernelMode, FALSE, NULL);
+                    ObDereferenceObject(gThreadObj[i]);
+                    gThreadObj[i] = NULL;
+                }
+            }
+
+            StopWFP();//可调用（幂等）。若StartWFP已成功，会注销callout/解除BFE订阅。
+            Unload(0);//注销进程回调、关闭通信端。
+
             if (g_SymbolicLinkName.Length) {
                 IoDeleteSymbolicLink(&g_SymbolicLinkName);
             }
@@ -162,12 +186,10 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT pDriverObject, _In_ PUNICODE_STRING pRe
             if (g_deviceObject) {
                 IoDeleteDevice(g_deviceObject);
             }
-
-            Unload(0);
         }
     }
 
-    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "��Ϣ��status:%#x", status);
+    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "信息：status:%#x", status);
 
     pDriverObject->DriverUnload = DriverUnload;
 
