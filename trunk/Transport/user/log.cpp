@@ -87,8 +87,38 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
 
 void LogW(IN LOG_LEVEL Level, IN wchar_t const * Format, ...)
 {
+    if (Level < ERROR_LEVEL || Level > MAX_LEVEL) {
+        return;
+    }
 
+    if (!BitTest((const LONG*)&g_log_level, Level)) {
+        return;
+    }
 
+    setlocale(LC_CTYPE, "chs");//支持写汉字。
+
+    EnterCriticalSection(&g_log_cs);
+
+    va_list args;
+    va_start(args, Format);
+
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    wchar_t time[MAX_PATH] = {0};//格式：2016-07-11 17:35:54
+    wsprintfW(time, L"%04d-%02d-%02d %02d:%02d:%02d:%03d\t", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    printf("%ls", time);
+
+    printf("%ls", g_log_level_w[Level]);
+
+    //先把宽字符格式化到缓冲，再用printf("%ls")输出，与LogA保持相同的窄流方向，避免宽/窄流方向冲突。
+    wchar_t body[1024] = {0};
+    StringCchVPrintfW(body, _countof(body), Format, args);
+    printf("%ls", body);
+
+    va_end(args);
+
+    LeaveCriticalSection(&g_log_cs);
 }
 
 
