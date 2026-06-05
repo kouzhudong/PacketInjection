@@ -313,16 +313,14 @@ void NTAPI IpPacketClassifyFn(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
 
 layerData参数的说明:
 A pointer to a structure that describes the raw data at the layer being filtered. 
-This parameter might be NULL, 
-depending on the layer being filtered and the conditions under which the classifyFn0 callout function is called. 
+This parameter might be NULL, depending on the layer being filtered and the conditions under which the classifyFn0 callout function is called. 
 For the stream layer, this parameter points to an FWPS_STREAM_CALLOUT_IO_PACKET0 structure. 
 For all of the other layers, this parameter points to a NET_BUFFER_LIST structure if it is not NULL.
 
 flowContext参数的说明:
 A UINT64-typed variable that contains the context associated with the data flow. 
 If no context is associated with the data flow, then this parameter is zero. 
-If the callout is added to the filter engine at a filtering layer that does not support data flows, 
-the classifyFn0 callout function should ignore this parameter.
+If the callout is added to the filter engine at a filtering layer that does not support data flows, the classifyFn0 callout function should ignore this parameter.
 */
 {
     //PFLOW_DATA flowData = *(PFLOW_DATA *)(UINT64 *)&flowContext;
@@ -363,8 +361,7 @@ the classifyFn0 callout function should ignore this parameter.
     }
 
     if (FlagOn(flags, FWP_CONDITION_FLAG_IS_IPSEC_SECURED) &&
-        (FlagOn(flags, FWP_CONDITION_FLAG_REQUIRES_ALE_CLASSIFY) ||
-         FWPS_IS_METADATA_FIELD_PRESENT(pMetadata, FWPS_METADATA_FIELD_ALE_CLASSIFY_REQUIRED))) {
+        (FlagOn(flags, FWP_CONDITION_FLAG_REQUIRES_ALE_CLASSIFY) || FWPS_IS_METADATA_FIELD_PRESENT(pMetadata, FWPS_METADATA_FIELD_ALE_CLASSIFY_REQUIRED))) {
         return;
     }    
 
@@ -383,15 +380,13 @@ the classifyFn0 callout function should ignore this parameter.
     }
 
     packetState = FwpsQueryPacketInjectionState(g_IpPacket_InjectionHandle, layerData, &injectionContext);
-    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) ||
-        (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) ||
-        gDriverUnloading) {
+    if ((packetState == FWPS_PACKET_INJECTED_BY_SELF) || (packetState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) || gDriverUnloading) {
         pClassifyOut->actionType = FWP_ACTION_PERMIT;
         if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
             pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
         }
 
-        return;// We don't re-inspect packets that we've inspected earlier.
+        return; // We don't re-inspect packets that we've inspected earlier.
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -457,9 +452,7 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 }
 
 
-NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
-                  _In_ const GUID * filterKey,
-                  _Inout_ FWPS_FILTER * filter)
+NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUID * filterKey, _Inout_ FWPS_FILTER * filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -469,10 +462,7 @@ NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
 }
 
 
-VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues,
-                         _In_ const FWPS_INCOMING_METADATA_VALUES * pMetadata,
-                         UINT16 layerId,
-                         UINT32 calloutId)
+VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES * pClassifyValues, _In_ const FWPS_INCOMING_METADATA_VALUES * pMetadata, UINT16 layerId, UINT32 calloutId)
 {
     PFLOW_DATA fc = NULL;
     NTSTATUS status = STATUS_SUCCESS;
@@ -741,12 +731,7 @@ void UnregisterAllCalloutId()
         if (temp[i]) {
             NtStatus = FwpsCalloutUnregisterById(temp[i]);
             if (!NT_SUCCESS(NtStatus)) {
-                PrintEx(DPFLTR_IHVNETWORK_ID,
-                        DPFLTR_WARNING_LEVEL,
-                        "错误：i:%d, id:%#x, NtStatus:%#x",
-                        i,
-                        temp[i],
-                        NtStatus);
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "错误：i:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
             }
 
             temp[i] = 0;//置零使StopWFP幂等(失败清理+卸载可能各调一次)。本工程FreePendedPacket不读此值，安全。

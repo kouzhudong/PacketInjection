@@ -116,15 +116,8 @@ NTSTATUS InboundInject(_In_ PPENDED_PACKET packet)
         return status;
     }
 
-    status = FwpsInjectNetworkReceiveAsync(InjectionHandle,
-                                           packet->injectionContext,
-                                           0,
-                                           packet->compartmentId,
-                                           packet->interfaceIndex,
-                                           packet->subInterfaceIndex,
-                                           clonedNetBufferList,
-                                           InjectComplete,
-                                           0);
+    status = FwpsInjectNetworkReceiveAsync(
+        InjectionHandle, packet->injectionContext, 0, packet->compartmentId, packet->interfaceIndex, packet->subInterfaceIndex, clonedNetBufferList, InjectComplete, 0);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
         FwpsFreeCloneNetBufferList(clonedNetBufferList, 0);
@@ -176,9 +169,7 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 */
 {
     SentToUser->Direction = packet->belongingFlow.Direction;
-
     SentToUser->Protocol = packet->belongingFlow.Protocol;
-
     SentToUser->SourceIp.addressFamily = packet->belongingFlow.addressFamily;
 
     switch (packet->belongingFlow.addressFamily) {
@@ -194,7 +185,6 @@ void CopyPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
     }
 
     SentToUser->SourcePort = packet->belongingFlow.SourcePort;
-
     SentToUser->DestinationIp.addressFamily = packet->belongingFlow.addressFamily;
 
     switch (packet->belongingFlow.addressFamily) {
@@ -295,41 +285,21 @@ void MapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
 
     MaximumSize.QuadPart = packet->KernelBufferLength;
     InitializeObjectAttributes(&ObjectAttributes, NULL, (OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE), NULL, NULL);
-    status = ZwCreateSection(&Section,
-                             SECTION_MAP_READ | SECTION_MAP_WRITE,// | SECTION_MAP_EXECUTE
-                             &ObjectAttributes,
-                             &MaximumSize,
-                             PAGE_READWRITE,//PAGE_READONLY PAGE_EXECUTE_READWRITE
-                             SEC_COMMIT,
-                             NULL);
+    status = ZwCreateSection(&Section, SECTION_MAP_READ | SECTION_MAP_WRITE, &ObjectAttributes, &MaximumSize, PAGE_READWRITE, SEC_COMMIT, NULL);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
         return;
     }
 
-    status = ObOpenObjectByPointer(g_Data.UserProcess,
-                                   OBJ_KERNEL_HANDLE,
-                                   NULL,
-                                   PROCESS_ALL_ACCESS,
-                                   *PsProcessType,
-                                   UserMode,
-                                   &Handle);//注意要关闭句柄。  
+    status = ObOpenObjectByPointer(g_Data.UserProcess, OBJ_KERNEL_HANDLE, NULL, PROCESS_ALL_ACCESS, *PsProcessType, UserMode, &Handle); // 注意要关闭句柄。
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
         ZwClose(Section);
         return;
     }
 
-    status = ZwMapViewOfSection(Section,
-                                Handle,
-                                (PVOID *)&SentToUser->UserBuffer,
-                                0L,
-                                packet->KernelBufferLength,
-                                NULL,
-                                &SentToUser->UserBufferLength,
-                                ViewShare,
-                                0L,
-                                PAGE_READWRITE); //PAGE_READONLY PAGE_EXECUTE_READWRITE
+    status = ZwMapViewOfSection(
+        Section, Handle, (PVOID *)&SentToUser->UserBuffer, 0L, packet->KernelBufferLength, NULL, &SentToUser->UserBufferLength, ViewShare, 0L, PAGE_READWRITE);
     if (!NT_SUCCESS(status)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
     } else {
@@ -358,13 +328,7 @@ void UnMapPackInfo2User(IN PPENDED_PACKET packet, OUT PNOTIFICATION SentToUser)
     HANDLE  KernelHandle = 0;
 
     if (SentToUser->UserBuffer && NULL != g_Data.UserProcess) {
-        status = ObOpenObjectByPointer(g_Data.UserProcess,
-                                       OBJ_KERNEL_HANDLE,
-                                       NULL,
-                                       PROCESS_ALL_ACCESS,
-                                       *PsProcessType,
-                                       UserMode,
-                                       &KernelHandle);//注意要关闭句柄。  
+        status = ObOpenObjectByPointer(g_Data.UserProcess, OBJ_KERNEL_HANDLE, NULL, PROCESS_ALL_ACCESS, *PsProcessType, UserMode, &KernelHandle); // 注意要关闭句柄。
         if (!NT_SUCCESS(status)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "错误：status:%#x", status);
         } else {
@@ -461,9 +425,7 @@ BOOL IsBlockPacker(PPENDED_PACKET packet)
     //结束的扫尾工作。
 
     UnMapPackInfo2User(packet, SentToUser);
-
     ExReleaseRundownProtection(&g_ClientPortRundown);
-
     ExFreePoolWithTag(SentToUser, TAG);
     return IsBlock;
 }
