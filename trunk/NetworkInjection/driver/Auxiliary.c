@@ -1,4 +1,4 @@
-#include "Auxiliary.h"
+ï»¿#include "Auxiliary.h"
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8,10 +8,10 @@ BOOLEAN LayerIsIPv4(_In_ UINT32 layerID)
 /**
 Purpose: Determine if the layer is an IPv4 layer.
 
-ËµÃ÷£º
-1.Õª×ÔWindows Filtering Platform Sample¹¤³ÌµÄKrnlHlprFwpmLayerIsIPv4º¯Êı¡£
-2.inspect¹¤³ÌÓĞ¸öGetAddressFamilyForLayerº¯Êı£¬¹¦ÄÜÀàËÆ£¬µ«ÊÇ¼òµ¥¡£
-3.DDProxy¹¤³ÌÊÇÖ±½ÓºÍFWPS_LAYER_ALE_FLOW_ESTABLISHED_V4±È½ÏµÄ£¬Õâ¸ö×î¼òµ¥¡£
+è¯´æ˜ï¼š
+1.æ‘˜è‡ªWindows Filtering Platform Sampleå·¥ç¨‹çš„KrnlHlprFwpmLayerIsIPv4å‡½æ•°ã€‚
+2.inspectå·¥ç¨‹æœ‰ä¸ªGetAddressFamilyForLayerå‡½æ•°ï¼ŒåŠŸèƒ½ç±»ä¼¼ï¼Œä½†æ˜¯ç®€å•ã€‚
+3.DDProxyå·¥ç¨‹æ˜¯ç›´æ¥å’ŒFWPS_LAYER_ALE_FLOW_ESTABLISHED_V4æ¯”è¾ƒçš„ï¼Œè¿™ä¸ªæœ€ç®€å•ã€‚
 */
 {
     BOOLEAN isIPv4 = FALSE;
@@ -68,9 +68,9 @@ Purpose: Determine if the layer is an IPv4 layer.
 
 void GetFlagsIndexesForLayer(_In_ UINT16 layerId, _Out_ UINT * flagsIndex)
 /*
-Õª×Ô£º\Windows-driver-samples\network\trans\inspect\sys\utils.h
+æ‘˜è‡ªï¼š\Windows-driver-samples\network\trans\inspect\sys\utils.h
 
-ÕıÈ·°´ÕÕFWPS_BUILTIN_LAYERS_µÄË³Ğò²¹³äÍê±Ï¡£
+æ­£ç¡®æŒ‰ç…§FWPS_BUILTIN_LAYERS_çš„é¡ºåºè¡¥å……å®Œæ¯•ã€‚
 */
 {
     switch (layerId) {
