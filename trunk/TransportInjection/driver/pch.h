@@ -1,16 +1,16 @@
-/*
-�ļ�����ȡ��VS2017�Ŀ���̨ʾ�����̵�ͷ�ļ�.
+﻿/*
+文件名字取自VS2017的控制台示例工程的头文件.
 
-����:Ԥ����ͷ,����û��������ǿ�Ƶ�һ����������ļ�.
+功能:预编译头,不过没有用命令强制第一个包含这个文件.
 
-ע��:
-1.����ļ�ֻ����ϵͳ��ͷ�ļ���һЩ����������.
-2.����ļ�ֻ����һЩ����������.
-3.Ҳ����˵���ͷ�ļ�ֻ׼��������ļ�,��׼�ٰ������ϵͳ�ļ�.
+注意:
+1.这个文件只包含系统的头文件和一些公共的数据.
+2.这个文件只包含一些公共的数据.
+3.也就是说别的头文件只准包含这个文件,不准再包含别的系统文件.
 
-���ļ���Ҫ���ڽ��:
-1.ϵͳ�ļ��������µı����������.
-2.ͳһ�滮�ļ��İ�����ϵ.
+此文件主要用于解决:
+1.系统文件包含导致的编译错误问题.
+2.统一规划文件的包含关系.
 */
 
 #pragma once
@@ -30,18 +30,18 @@ extern "C" {
 
 #define POOL_NX_OPTIN 1
 
-#pragma warning(disable:4200) // ʹ���˷Ǳ�׼��չ : �ṹ/�����е����С����
+#pragma warning(disable:4200) // 使用了非标准扩展 : 结构/联合中的零大小数组
 #pragma warning(disable:4201) // unnamed struct/union
-#pragma warning(disable:4214) // ʹ���˷Ǳ�׼��չ: ���������λ������
-#pragma warning(disable:4127) // ��������ʽ�ǳ���
-#pragma warning(disable:4057) // ����΢��ͬ�Ļ����ͼ��Ѱַ�ϲ�ͬ
-#pragma warning(disable:4152) // �Ǳ�׼��չ������ʽ�еĺ���/����ָ��ת��
-#pragma warning(disable:28172) //The function 'XXX' has PAGED_CODE or PAGED_CODE_LOCKED but is not declared to be in a paged segment. ԭ��1.������IRQL������2.�����ڵĺ����Ĳ����þֲ���������Ҫ����������ǷǷ�ҳ�ڴ档
+#pragma warning(disable:4214) // 使用了非标准扩展: 整形以外的位域类型
+#pragma warning(disable:4127) // 条件表达式是常量
+#pragma warning(disable:4057) // 在稍微不同的基类型间接寻址上不同
+#pragma warning(disable:4152) // 非标准扩展，表达式中的函数/数据指针转换
+#pragma warning(disable:28172) //The function 'XXX' has PAGED_CODE or PAGED_CODE_LOCKED but is not declared to be in a paged segment. 原因：1.函数内IRQL升级，2.函数内的函数的参数用局部变量，且要求这个变量是非分页内存。
 
 #include <ntifs.h>
 #include <wdm.h>
 #include <ntddk.h>
-#include <windef.h> //Ӧ�÷���ntddk.h�ĺ���.
+#include <windef.h> //应该放在ntddk.h的后面.
 #include <in6addr.h>
 #include <ip2string.h>
 
@@ -49,7 +49,7 @@ extern "C" {
 #include <guiddef.h>
 
 #include <ndis.h>
-#include <initguid.h> //��̬����UUID�õģ�����error LNK2001��
+#include <initguid.h> //静态定义UUID用的，否则：error LNK2001。
 #include <Ntstrsafe.h>
 #include <ipmib.h>
 #include <netpnp.h>
@@ -62,13 +62,13 @@ extern "C" {
 #include <initguid.h>
 
 /*
-WDK7600.16385.1���ں�ͷ�ļ�û��u_short�Ķ���,�û����ͷ�ļ���u_short�Ķ���.
-SOCKADDR�ṹ���õ�u_short.
-SOCKADDR��ws2def.h�ж���.
-ws2def.h������ֱ�Ӱ���.
-netioapi.h����ws2def.h���ļ�.
-������WDK7600.16385.1��,���������Ӧ�ò��ͷ�ļ�,Ӧ���ڰ���netioapi.h֮ǰ,����u_short�Ķ���.
-����,ÿ������(������Ӱ���)ws2def.h��c/cpp�ļ�������һ��ѵĴ���.
+WDK7600.16385.1的内核头文件没有u_short的定义,用户层的头文件有u_short的定义.
+SOCKADDR结构里用到u_short.
+SOCKADDR在ws2def.h中定义.
+ws2def.h不建议直接包含.
+netioapi.h包含ws2def.h等文件.
+所以在WDK7600.16385.1中,如果不包含应用层的头文件,应该在包含netioapi.h之前,加上u_short的定义.
+否者,每个包含(包括间接包含)ws2def.h的c/cpp文件都出现一大堆的错误.
 */
     typedef unsigned short  u_short;
 #include <netioapi.h>
@@ -111,18 +111,18 @@ netioapi.h����ws2def.h���ļ�.
 #define __FILENAMEW__ (wcsrchr(_CRT_WIDE(__FILE__), L'\\') ? wcsrchr(_CRT_WIDE(__FILE__), L'\\') + 1 : _CRT_WIDE(__FILE__))
 
 /*
-��֧�ֵ��ַ�Ҳ֧�ֿ��ַ���
-ע�⣺
-1.�����������ǵ��ַ�������Ϊ�գ�����ҪΪNULL��������ʡ�ԡ�
-2.������DPC�ϲ�Ҫ��ӡ���ַ���
+既支持单字符也支持宽字符。
+注意：
+1.第三个参数是单字符，可以为空，但不要为NULL，更不能省略。
+2.驱动在DPC上不要打印宽字符。
 3.
 */
 
-//���֧��3����������
+//这个支持3三个参数。
 #define Print(ComponentId, Level, Format, ...) \
 {DbgPrintEx(ComponentId, Level, "FILE:%s, LINE:%d, "##Format".\r\n", __FILENAME__, __LINE__, __VA_ARGS__);}
 
-//�������4��������
+//这个最少4个参数。
 #define PrintEx(ComponentId, Level, Format, ...) \
 {KdPrintEx((ComponentId, Level, "FILE:%s, LINE:%d, "##Format".\r\n", __FILENAME__, __LINE__, __VA_ARGS__));}
 

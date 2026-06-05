@@ -1,8 +1,12 @@
-#include "CommunicationPort.h"
+ï»¿#include "CommunicationPort.h"
 #include "..\public\public.h"
 
 
 DATA g_Data;//  Structure that contains all the global data structures used throughout the scanner.
+
+//ä¿æŠ¤ä¸åº”ç”¨å±‚åœ¨çº¿é€šä¿¡(FltSendMessage)æœŸé—´ï¼ŒClientPort/UserProcessä¸è¢«å¹¶å‘çš„PortDisconnecté‡Šæ”¾ã€‚
+//CreateCommunicationPortåˆå§‹åŒ–ï¼ŒPortConnecté‡ç½®ï¼ŒPortDisconnectæ’ç©ºï¼Œå·¥ä½œçº¿ç¨‹å‘é€å‰åacquire/releaseã€‚
+EX_RUNDOWN_REF g_ClientPortRundown;
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10,7 +14,7 @@ DATA g_Data;//  Structure that contains all the global data structures used thro
 
 NTSTATUS Unload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 /*
-Ã»ÓĞFltStartFilteringÕâ¸öº¯Êı²»»á±»µ÷ÓÃ¡£
+æ²¡æœ‰FltStartFilteringè¿™ä¸ªå‡½æ•°ä¸ä¼šè¢«è°ƒç”¨ã€‚
 */
 {
     //NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -18,11 +22,13 @@ NTSTATUS Unload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
     UNREFERENCED_PARAMETER(Flags);
 
     if (NULL != g_Data.ServerPort) {
-        FltCloseCommunicationPort(g_Data.ServerPort);//  Close the server port.  
+        FltCloseCommunicationPort(g_Data.ServerPort);//  Close the server port.
+        g_Data.ServerPort = NULL;
     }
 
     if (NULL != g_Data.Filter) {
         FltUnregisterFilter(g_Data.Filter);//  Unregister the filter
+        g_Data.Filter = NULL;//ç½®ç©ºï¼Œé¿å…å¤±è´¥æ¸…ç†è·¯å¾„(DriverEntry __finally)äºŒæ¬¡æ³¨é”€åŒä¸€å·²é”€æ¯filterã€‚
     }
 
     return STATUS_SUCCESS;
@@ -140,6 +146,9 @@ NTSTATUS PortConnect(_In_ PFLT_PORT ClientPort,
     FLT_ASSERT(g_Data.ClientPort == NULL);
     FLT_ASSERT(g_Data.UserProcess == NULL);
 
+    //é‡ç½®rundownï¼Œä½¿ä¸Šä¸€æ¬¡æ–­å¼€(drain)åæœ¬æ¬¡è¿æ¥å¯å†æ¬¡acquireã€‚é¡»åœ¨å‘å¸ƒClientPort/UserProcesså‰ã€‚
+    ExReInitializeRundownProtection(&g_ClientPortRundown);
+
     g_Data.UserProcess = PsGetCurrentProcess();
     g_Data.ClientPort = ClientPort;
 
@@ -155,7 +164,10 @@ VOID PortDisconnect(_In_opt_ PVOID ConnectionCookie)
 
     PAGED_CODE();
 
-    FltCloseClientPort(g_Data.Filter, &g_Data.ClientPort);//Õâ¸öº¯Êı»á°ÑµÚ¶ş¸ö²ÎÊıÉèÖÃÎª0.
+    //å…ˆç­‰æ‰€æœ‰åœ¨é€”çš„FltSendMessageå‘é€å®Œæˆ(å·¥ä½œçº¿ç¨‹é‡Šæ”¾rundown)ï¼Œå†å…³é—­ç«¯å£/æ¸…ç©ºè¿›ç¨‹ï¼Œæ¶ˆé™¤TOCTOU/UAFã€‚
+    ExWaitForRundownProtectionRelease(&g_ClientPortRundown);
+
+    FltCloseClientPort(g_Data.Filter, &g_Data.ClientPort);//è¿™ä¸ªå‡½æ•°ä¼šæŠŠç¬¬äºŒä¸ªå‚æ•°è®¾ç½®ä¸º0.
 
     //g_Data.UserProcess = NULL;//  Reset the user-process field.
     InterlockedExchangePointer(&g_Data.UserProcess, NULL);
@@ -167,8 +179,8 @@ NTSTATUS MessageNotifyCallback(
     IN PVOID InputBuffer OPTIONAL,
     IN ULONG InputBufferLength,
     OUT PVOID OutputBuffer OPTIONAL,
-    IN ULONG OutputBufferLength,//ÓÃ»§¿ÉÒÔ½ÓÊÜµÄÊı¾İµÄ×î´ó³¤¶È.
-    OUT PULONG ReturnOutputBufferLength//ÓÃ»§Êµ¼Ê½ÓÊÕµÄÊı¾İ´óĞ¡£¬ºÍOutputBufferÓ¦¸ÃÒ»ÖÂ¡£
+    IN ULONG OutputBufferLength,//ç”¨æˆ·å¯ä»¥æ¥å—çš„æ•°æ®çš„æœ€å¤§é•¿åº¦.
+    OUT PULONG ReturnOutputBufferLength//ç”¨æˆ·å®é™…æ¥æ”¶çš„æ•°æ®å¤§å°ï¼Œå’ŒOutputBufferåº”è¯¥ä¸€è‡´ã€‚
 );
 #pragma alloc_text(PAGE, MessageNotifyCallback)
 NTSTATUS MessageNotifyCallback(
@@ -176,8 +188,8 @@ NTSTATUS MessageNotifyCallback(
     IN PVOID InputBuffer OPTIONAL,
     IN ULONG InputBufferLength,
     OUT PVOID OutputBuffer OPTIONAL,
-    IN ULONG OutputBufferLength,//ÓÃ»§¿ÉÒÔ½ÓÊÜµÄÊı¾İµÄ×î´ó³¤¶È.
-    OUT PULONG ReturnOutputBufferLength//ÓÃ»§Êµ¼Ê½ÓÊÕµÄÊı¾İ´óĞ¡£¬ºÍOutputBufferÓ¦¸ÃÒ»ÖÂ¡£
+    IN ULONG OutputBufferLength,//ç”¨æˆ·å¯ä»¥æ¥å—çš„æ•°æ®çš„æœ€å¤§é•¿åº¦.
+    OUT PULONG ReturnOutputBufferLength//ç”¨æˆ·å®é™…æ¥æ”¶çš„æ•°æ®å¤§å°ï¼Œå’ŒOutputBufferåº”è¯¥ä¸€è‡´ã€‚
 )
 /*
 Routine Description:
@@ -207,10 +219,10 @@ Returns the status of processing the message.
 //
 //  The minifilter MUST continue to use a try/except around any access to these buffers.
 
-ÕâÀïÒª×¢Òâ:1.Êı¾İµØÖ·µÄ¶ÔÆë.
-2.ÎÄµµ½¨ÒéÊ¹ÓÃ:try/except´¦Àí.
-3.Èç¹ûÊÇ64Î»µÄÇı¶¯Òª¿¼ÂÇ32Î»µÄEXE·¢À´µÄÇëÇó£¨IoIs32bitProcess£©.
-ÕâÀï¹æ¶¨£º´«µİ¹ıÀ´µÄÊÇÒ»¸ö½á¹¹£¬½á¹¹µÄµÚÒ»¸ö³ÉÔ±ÊÇint£¬Ò²¾ÍÊÇ×Ô¶¨ÒåµÄÏûÏ¢µÄÀà±ğ¡£
+è¿™é‡Œè¦æ³¨æ„:1.æ•°æ®åœ°å€çš„å¯¹é½.
+2.æ–‡æ¡£å»ºè®®ä½¿ç”¨:try/exceptå¤„ç†.
+3.å¦‚æœæ˜¯64ä½çš„é©±åŠ¨è¦è€ƒè™‘32ä½çš„EXEå‘æ¥çš„è¯·æ±‚ï¼ˆIoIs32bitProcessï¼‰.
+è¿™é‡Œè§„å®šï¼šä¼ é€’è¿‡æ¥çš„æ˜¯ä¸€ä¸ªç»“æ„ï¼Œç»“æ„çš„ç¬¬ä¸€ä¸ªæˆå‘˜æ˜¯intï¼Œä¹Ÿå°±æ˜¯è‡ªå®šä¹‰çš„æ¶ˆæ¯çš„ç±»åˆ«ã€‚
 */
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -219,7 +231,6 @@ Returns the status of processing the message.
     PAGED_CODE();
 
     UNREFERENCED_PARAMETER(PortCookie);
-    UNREFERENCED_PARAMETER(InputBufferLength);
     UNREFERENCED_PARAMETER(ReturnOutputBufferLength);
     UNREFERENCED_PARAMETER(OutputBufferLength);
     UNREFERENCED_PARAMETER(OutputBuffer);
@@ -230,11 +241,16 @@ Returns the status of processing the message.
 
         ////  Validate alignment for the 32bit process on a 64bit system
         //if (!IS_ALIGNED(OutputBuffer, sizeof(ULONG))) {
-        //    status = STATUS_DATATYPE_MISALIGNMENT;   
+        //    status = STATUS_DATATYPE_MISALIGNMENT;
         //    return status;
         //}
     }
 #endif
+
+    //è§£å¼•ç”¨å‰æ ¡éªŒé•¿åº¦ï¼Œé¿å…å¯¹NULLæˆ–è¿‡çŸ­ç¼“å†²åŒºå–Commandã€‚
+    if (NULL == InputBuffer || InputBufferLength < sizeof(COMMAND_MESSAGE)) {
+        return STATUS_INVALID_PARAMETER;
+    }
 
     __try {//  Probe and capture input message: the message is raw user mode buffer, so need to protect with exception handler
         command = ((PCOMMAND_MESSAGE)InputBuffer)->Command;
@@ -243,7 +259,7 @@ Returns the status of processing the message.
     }
 
     switch (command) {
-        //case PASS_PID://»ñÈ¡ÓÃ»§µÄ´«À´µÄPID£¬Ó¦¸Ã·ÅÈëÒ»¸öÁ´±íÀïÃæ¡£
+        //case PASS_PID://è·å–ç”¨æˆ·çš„ä¼ æ¥çš„PIDï¼Œåº”è¯¥æ”¾å…¥ä¸€ä¸ªé“¾è¡¨é‡Œé¢ã€‚
         //    status = save_pid(InputBuffer);
         //    break;
     default:
@@ -265,9 +281,12 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     PSECURITY_DESCRIPTOR sd;
     NTSTATUS status;
 
+    //åˆå§‹åŒ–rundownï¼Œå¿…é¡»åœ¨FltCreateCommunicationPortä¹‹å‰(è¿æ¥æˆåŠŸåæ‰å¯èƒ½è§¦å‘PortConnect)ã€‚
+    ExInitializeRundownProtection(&g_ClientPortRundown);
+
     status = FltRegisterFilter(DriverObject, &FilterRegistration, &g_Data.Filter);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         return status;
     }
 
@@ -276,10 +295,11 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     //  We secure the port so only ADMINs & SYSTEM can acecss it.
     status = FltBuildDefaultSecurityDescriptor(&sd, FLT_PORT_ALL_ACCESS);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         FltUnregisterFilter(g_Data.Filter);
+        g_Data.Filter = NULL;
         return status;
-    } 
+    }
 
     InitializeObjectAttributes(&oa, &uniString, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, sd);
     status = FltCreateCommunicationPort(g_Data.Filter,
@@ -293,8 +313,9 @@ NTSTATUS CreateCommunicationPort(_In_ PDRIVER_OBJECT DriverObject)
     //  Free the security descriptor in all cases.
     //  It is not needed once the call to FltCreateCommunicationPort() is made.    
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "´íÎó£ºstatus:%#x", status);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "é”™è¯¯ï¼šstatus:%#x", status);
         FltUnregisterFilter(g_Data.Filter);
+        g_Data.Filter = NULL;
     }
 
     FltFreeSecurityDescriptor(sd);

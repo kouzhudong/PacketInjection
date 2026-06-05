@@ -1,4 +1,4 @@
-#include "DataGram.h"
+﻿#include "DataGram.h"
 #include "Register.h"
 
 
@@ -18,16 +18,16 @@ PPENDED_PACKET BuildDataGramPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixed
 
     packet = ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(PENDED_PACKET), TAG);
     if (NULL == packet) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "��Ϣ��%s", "�����ڴ�ʧ��");
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "信息：%s", "申请内存失败");
         return packet;
     }
     RtlZeroMemory(packet, sizeof(PENDED_PACKET));
 
-    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "��Ϣ������ DataGram packet:%p", packet);
+    PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "信息：创建 DataGram packet:%p", packet);
 
     packet->belongingFlow = flowContextLocal;
 
-    ReferenceFlowContext(flowContextLocal);/*��ֹ�ڴ汻�ͷ�*/
+    ReferenceFlowContext(flowContextLocal);/*防止内存被释放*/
 
     if (flowContextLocal->addressFamily == AF_INET) {
         packet->direction = inFixedValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_DIRECTION].value.uint32;
@@ -59,10 +59,12 @@ PPENDED_PACKET BuildDataGramPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixed
             ASSERT(inMetaValues->controlDataLength > 0);
 
             packet->controlData = ExAllocatePool2(POOL_FLAG_NON_PAGED, inMetaValues->controlDataLength, TAG);
-            ASSERT(packet->controlData);
-            RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
-
-            packet->controlDataLength = inMetaValues->controlDataLength;
+            if (NULL != packet->controlData) {
+                RtlCopyMemory(packet->controlData, inMetaValues->controlData, inMetaValues->controlDataLength);
+                packet->controlDataLength = inMetaValues->controlDataLength;
+            } else {
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "分配controlData失败，length:%u", inMetaValues->controlDataLength);
+            }
         }
     } else {
         //ASSERT(packet->direction == FWP_DIRECTION_INBOUND);
@@ -114,7 +116,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     UNREFERENCED_PARAMETER(classifyContext);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //�Ź�һЩ������
+    //放过一些处理。
 
     _Analysis_assume_(layerData != NULL);
     ASSERT(layerData != NULL);
@@ -147,7 +149,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     //////////////////////////////////////////////////////////////////////////////////////////////
 
      /*
-     ��ȡ/����һ���ڵ���Ϣ.
+     获取/制作一个节点信息.
      */
     packet = BuildDataGramPendPacket(pClassifyValues, pMetadata, layerData, flowData);
     if (packet == NULL) {
@@ -158,16 +160,19 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
         return;
     }
 
-    GetNetWorkInfo(pClassifyValues, packet);
+    //不再调用GetNetWorkInfo：它把per-packet数据写入【共享】flow上下文(belongingFlow是指针)，
+    //classify多CPU并发→数据竞争；且5元组在ALE_FLOW_ESTABLISHED时已填好。方向用packet->direction(见CopyPackInfo2User)。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ����һ���ڵ�.
+    插入一个节点.
     */
     KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &lockHandle);
     InsertTailList(&g_PacketList, &packet->listEntry);
     KeReleaseInStackQueuedSpinLock(&lockHandle);
+
+    KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);//唤醒工作线程处理，取代1秒轮询。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 

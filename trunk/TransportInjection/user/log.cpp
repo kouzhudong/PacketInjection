@@ -1,51 +1,51 @@
-#include "log.h"
+ï»¿#include "log.h"
 
 #pragma warning(disable:26812)
 
 
 /*
-ºÍLOG_LEVEL¶ÔÓ¦£¬²»ÄÜÉÙ¡£
-¶¨ÒåÎ´¶¨ÒåÊÇ·ÀÖ¹Ô½½ç¡£
+å’ŒLOG_LEVELå¯¹åº”ï¼Œä¸èƒ½å°‘ã€‚
+å®šä¹‰æœªå®šä¹‰æ˜¯é˜²æ­¢è¶Šç•Œã€‚
 */
 const wchar_t* g_log_level_w[MAX_LEVEL + 1] = {
-    L"´íÎóĞÅÏ¢£º",
-    L"¾¯¸æĞÅÏ¢£º",
-    L"ÖØÒªĞÅÏ¢£º",
-    L"ÆÕÍ¨ĞÅÏ¢£º",
-    L"Èß³¤ĞÅÏ¢£º",
-    L"¸ú×ÙĞÅÏ¢£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º",
-    L"Î´¶¨Òå£º"
+    L"é”™è¯¯ä¿¡æ¯ï¼š",
+    L"è­¦å‘Šä¿¡æ¯ï¼š",
+    L"é‡è¦ä¿¡æ¯ï¼š",
+    L"æ™®é€šä¿¡æ¯ï¼š",
+    L"å†—é•¿ä¿¡æ¯ï¼š",
+    L"è·Ÿè¸ªä¿¡æ¯ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š",
+    L"æœªå®šä¹‰ï¼š"
 };
 
 
-CRITICAL_SECTION g_log_cs;//Í¬²½ÈÕÖ¾ÎÄ¼şµÄ¶ÔÏó¡£
+CRITICAL_SECTION g_log_cs;//åŒæ­¥æ—¥å¿—æ–‡ä»¶çš„å¯¹è±¡ã€‚
 
 
-ULONG g_log_level = DEFAULT_LOG_LEVEL;//ÈÕÖ¾¿ª¹Ø£¬ÓÉÅäÖÃÎÄ¼ş¿ØÖÆ¡£
+ULONG g_log_level = DEFAULT_LOG_LEVEL;//æ—¥å¿—å¼€å…³ï¼Œç”±é…ç½®æ–‡ä»¶æ§åˆ¶ã€‚
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
         return;
     }
 
-    setlocale(0, "chs");//Ö§³ÖĞ´ºº×Ö¡£
+    setlocale(0, "chs");//æ”¯æŒå†™æ±‰å­—ã€‚
 
     EnterCriticalSection(&g_log_cs);
 
@@ -70,13 +70,13 @@ void LogA(IN LOG_LEVEL Level, IN char const * Format, ...)
 
     SYSTEMTIME st;
     GetLocalTime(&st);
-    wchar_t time[MAX_PATH] = {0};//¸ñÊ½£º2016-07-11 17:35:54 
+    wchar_t time[MAX_PATH] = {0};//æ ¼å¼ï¼š2016-07-11 17:35:54 
     int written = wsprintfW(time, L"%04d-%02d-%02d %02d:%02d:%02d:%03d\t", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
     written = printf("%ls", time);
 
     #pragma prefast(push)
-    #pragma prefast(disable: 33010, "ÒÑÈ¡ÏûÑ¡ÖĞ³äµ±Ë÷ÒıµÄÃ¶¾Ù Level µÄÏÂÏŞ¡£")
+    #pragma prefast(disable: 33010, "å·²å–æ¶ˆé€‰ä¸­å……å½“ç´¢å¼•çš„æšä¸¾ Level çš„ä¸‹é™ã€‚")
     written = printf("%ls", g_log_level_w[Level]);
     #pragma prefast(pop)    
 
@@ -100,7 +100,7 @@ void LogW(IN LOG_LEVEL Level, IN wchar_t const * Format, ...)
 
 #ifdef _DEBUG
 void DebugPrintA(const char * format, ...)
-//OutputDebugStringA ×î³¤Ö§³Ö 65534£¨MAXUINT16 - 1£© ¸ö×Ö·ûµÄÊä³ö(°üÀ¨½áÎ²µÄ L'\0').
+//OutputDebugStringA æœ€é•¿æ”¯æŒ 65534ï¼ˆMAXUINT16 - 1ï¼‰ ä¸ªå­—ç¬¦çš„è¾“å‡º(åŒ…æ‹¬ç»“å°¾çš„ L'\0').
 {
     size_t len = MAXUINT16;
 
@@ -126,7 +126,7 @@ void DebugPrintA(char * format, ...)
 
 #ifdef _DEBUG
 void DebugPrintW(const wchar_t * format, ...)
-//OutputDebugStringW ×î³¤Ö§³Ö 32766£¨MAXINT16 - 1£© ¸ö×Ö·ûµÄÊä³ö(°üÀ¨½áÎ²µÄ L'\0').
+//OutputDebugStringW æœ€é•¿æ”¯æŒ 32766ï¼ˆMAXINT16 - 1ï¼‰ ä¸ªå­—ç¬¦çš„è¾“å‡º(åŒ…æ‹¬ç»“å°¾çš„ L'\0').
 {
     size_t len = MAXINT16 * sizeof(WCHAR);
     wchar_t * out = (wchar_t *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, len);
