@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "pch.h"
 #include "..\public\public.h"
@@ -11,12 +11,12 @@
 
 
 /*
-´Ë½á¹¹²»½¨ÒéËæ±ãĞŞ¸Ä¡£
+æ­¤ç»“æ„ä¸å»ºè®®éšä¾¿ä¿®æ”¹ã€‚
 */
 typedef struct _MESSAGE {
     FILTER_MESSAGE_HEADER MessageHeader;//  Required structure header.
 
-    NOTIFICATION Notification;//×Ô¼º¶¨ÒåµÄÊı¾İ½á¹¹.
+    NOTIFICATION Notification;//è‡ªå·±å®šä¹‰çš„æ•°æ®ç»“æ„.
 
     //  Overlapped structure: this is not really part of the message
     //  However we embed it instead of using a separately allocated overlap structure
@@ -25,12 +25,12 @@ typedef struct _MESSAGE {
 
 
 /*
-´Ë½á¹¹²»½¨ÒéËæ±ãĞŞ¸Ä¡£
+æ­¤ç»“æ„ä¸å»ºè®®éšä¾¿ä¿®æ”¹ã€‚
 */
 typedef struct _REPLY_MESSAGE {
     FILTER_REPLY_HEADER ReplyHeader;//  Required structure header.
 
-    REPLY Reply;//×Ô¼º¶¨ÒåµÄÊı¾İ½á¹¹.
+    REPLY Reply;//è‡ªå·±å®šä¹‰çš„æ•°æ®ç»“æ„.
 } REPLY_MESSAGE, * PREPLY_MESSAGE;
 
 

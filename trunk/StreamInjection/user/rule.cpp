@@ -1,4 +1,4 @@
-#include "rule.h"
+ï»¿#include "rule.h"
 #include "CommunicationThread.h"
 #include "log.h"
 
@@ -33,7 +33,7 @@ const wchar_t* get_protocol_name(IPPROTO protocol)
         protocol_name = L"ICMPV6";
         break;
     default:
-        protocol_name = L"Î´Öª";//Ò²¿É´òÓ¡Ò»¸öÊýÖµ¡£
+        protocol_name = L"æœªçŸ¥";//ä¹Ÿå¯æ‰“å°ä¸€ä¸ªæ•°å€¼ã€‚
         break;
     }
 
@@ -43,13 +43,13 @@ const wchar_t* get_protocol_name(IPPROTO protocol)
 
 BOOL ApplyRule(PNOTIFICATION notification)
 /*
-ÄãµÄ´úÂë¶¼ÔÚÕâÀï¡£
+ä½ çš„ä»£ç éƒ½åœ¨è¿™é‡Œã€‚
 
-Õâ£¬¿É£¬½øÒ»²½µÄ·â×°£¬·â×°³ÉÀà£¬¸ø¸ö»Øµ÷º¯Êý¡£
+è¿™ï¼Œå¯ï¼Œè¿›ä¸€æ­¥çš„å°è£…ï¼Œå°è£…æˆç±»ï¼Œç»™ä¸ªå›žè°ƒå‡½æ•°ã€‚
 
-ÕâÀïÖ»¿É½âÎöÍøÂçºÍ·µ»Ø×è¶Ï£¬µ«²»ÄÜÐÞ¸ÄÍøÂç¡£
+è¿™é‡Œåªå¯è§£æžç½‘ç»œå’Œè¿”å›žé˜»æ–­ï¼Œä½†ä¸èƒ½ä¿®æ”¹ç½‘ç»œã€‚
 
-Õâ¸ö¹¦ÄÜ¶¼ÓÐ¿´¹ÙÈ¥×ö°É£¡
+è¿™ä¸ªåŠŸèƒ½éƒ½æœ‰çœ‹å®˜åŽ»åšå§ï¼
 */
 {
     BOOL IsBlock = FALSE;
@@ -64,13 +64,13 @@ BOOL ApplyRule(PNOTIFICATION notification)
 
 void ResolutionProtocol(PNOTIFICATION notification)
 /*
-¹¦ÄÜ£º¸ù¾ÝPNOTIFICATIONÌá¹©µÄÐÅÏ¢£¬½âÎöUserBufferÀïµÄÍøÂçÐ­ÒéÊý¾Ý£¬³¤¶ÈÎªUserBufferLength¡£
+åŠŸèƒ½ï¼šæ ¹æ®PNOTIFICATIONæä¾›çš„ä¿¡æ¯ï¼Œè§£æžUserBufferé‡Œçš„ç½‘ç»œåè®®æ•°æ®ï¼Œé•¿åº¦ä¸ºUserBufferLengthã€‚
 
-×¢Òâ£ºÄÚ´æÊôÐÔÎª£º²»¿ÉÐ´ºÍ²»¿ÉÖ´ÐÐ¡£
+æ³¨æ„ï¼šå†…å­˜å±žæ€§ä¸ºï¼šä¸å¯å†™å’Œä¸å¯æ‰§è¡Œã€‚
 
-Õâ¸ö¹¦ÄÜ¶¼ÓÐ¿´¹ÙÈ¥×ö°É£¡
+è¿™ä¸ªåŠŸèƒ½éƒ½æœ‰çœ‹å®˜åŽ»åšå§ï¼
 
-ÕâÀï²»½¨ÒéÐÞ¸ÄÄÚ´æ£¬¼´Ê¹ÄÚ´æ¿ÉÐ´£¬Ð´ÁËÒ²ÎÞÐ§£¬ÒòÎªÇý¶¯²»Ö§³Ö£¬Ã»×öÐÞ¸Ä¡£
+è¿™é‡Œä¸å»ºè®®ä¿®æ”¹å†…å­˜ï¼Œå³ä½¿å†…å­˜å¯å†™ï¼Œå†™äº†ä¹Ÿæ— æ•ˆï¼Œå› ä¸ºé©±åŠ¨ä¸æ”¯æŒï¼Œæ²¡åšä¿®æ”¹ã€‚
 */
 {
     if (NULL == notification) {
@@ -94,7 +94,7 @@ void ResolutionProtocol(PNOTIFICATION notification)
     BYTE test = *(PBYTE)notification->UserBuffer;
 
     LOGA(VERBOSE_INFO_LEVEL,
-         "\r\nµÚÒ»¸ö×Ö½ÚÊÇ£º%#x, Êý¾Ý³¤¶È£º%d£¬¿ÉÓÃ³¤¶È£º%d£¬¶àÓà³¤¶È£º%d¡£\r\n\r\n",
+         "\r\nç¬¬ä¸€ä¸ªå­—èŠ‚æ˜¯ï¼š%#x, æ•°æ®é•¿åº¦ï¼š%dï¼Œå¯ç”¨é•¿åº¦ï¼š%dï¼Œå¤šä½™é•¿åº¦ï¼š%dã€‚\r\n\r\n",
          test,
          notification->DataLength,
          notification->UserBufferLength,
@@ -111,14 +111,14 @@ void ResolutionProtocol(PNOTIFICATION notification)
 
 VOID ShowMessage(PNOTIFICATION notification)
 /*
-¹¦ÄÜ£º´òÓ¡Çý¶¯ÉÏ±¨µÄÊÂ¼þ¡£
+åŠŸèƒ½ï¼šæ‰“å°é©±åŠ¨ä¸ŠæŠ¥çš„äº‹ä»¶ã€‚
 
-×÷ÓÃ£º¼ì²âÕâ¼¸¸öÏß³ÌÊÇ·ñ¹¤×÷Õý³£¡£
+ä½œç”¨ï¼šæ£€æµ‹è¿™å‡ ä¸ªçº¿ç¨‹æ˜¯å¦å·¥ä½œæ­£å¸¸ã€‚
 
-×¢Òâ£º
-1.²»¿ªÆô¼ì²â²»ÀË·Ñ×ÊÔ´£¬¿ªÆôÁËÓ°ÏìËÙ¶È¡£
-2.Õâ¸öÏûÏ¢ÊÇºÜÆµ·±µÄ¡£
-3.Õâ¸öÏûÏ¢µÄ¾ßÌåµÄÄÚÈÝÒ²ÊÇºÜ¶àµÄ¡£
+æ³¨æ„ï¼š
+1.ä¸å¼€å¯æ£€æµ‹ä¸æµªè´¹èµ„æºï¼Œå¼€å¯äº†å½±å“é€Ÿåº¦ã€‚
+2.è¿™ä¸ªæ¶ˆæ¯æ˜¯å¾ˆé¢‘ç¹çš„ã€‚
+3.è¿™ä¸ªæ¶ˆæ¯çš„å…·ä½“çš„å†…å®¹ä¹Ÿæ˜¯å¾ˆå¤šçš„ã€‚
 */
 {
     WCHAR SourceIp[MAX_ADDRESS_STRING_LENGTH + 1] = {0};
@@ -129,7 +129,7 @@ VOID ShowMessage(PNOTIFICATION notification)
         notification->SourceIp.ipv4.S_un.S_addr = ntohl(notification->SourceIp.ipv4.S_un.S_addr);
         InetNtop(AF_INET, &notification->SourceIp.ipv4, SourceIp, _countof(SourceIp));
         break;
-    case AF_INET6://×¢Òâ×Ö½ÚÐò£ºRtlUlongByteSwap
+    case AF_INET6://æ³¨æ„å­—èŠ‚åºï¼šRtlUlongByteSwap
         InetNtop(AF_INET6, &notification->SourceIp.ipv6, SourceIp, _countof(SourceIp));
         //Ipv6AddressToStringW(&notification->SourceIp.ipv6, SourceIp);
         break;
@@ -146,7 +146,7 @@ VOID ShowMessage(PNOTIFICATION notification)
         notification->DestinationIp.ipv4.S_un.S_addr = ntohl(notification->DestinationIp.ipv4.S_un.S_addr);
         InetNtop(AF_INET, &notification->DestinationIp.ipv4, DestinationIp, _countof(DestinationIp));
         break;
-    case AF_INET6://×¢Òâ×Ö½ÚÐò£ºRtlUlongByteSwap
+    case AF_INET6://æ³¨æ„å­—èŠ‚åºï¼šRtlUlongByteSwap
         InetNtop(AF_INET6, &notification->DestinationIp.ipv6, DestinationIp, _countof(DestinationIp));
         //Ipv6AddressToStringW(&notification->DestinationIp.ipv6, DestinationIp);
         break;
@@ -156,9 +156,9 @@ VOID ShowMessage(PNOTIFICATION notification)
     }
 
     LOGA(VERBOSE_INFO_LEVEL, 
-         "\r\nSourceIp:%ls, SourcePort:%d, DestinationIp:%ls, DestinationPort:%d¡£\r\n"
-         "Direction:%ls, Protocol:%ls¡£\r\n"
-         "pid:%d, processPath:%ls¡£\r\n\r\n",
+         "\r\nSourceIp:%ls, SourcePort:%d, DestinationIp:%ls, DestinationPort:%dã€‚\r\n"
+         "Direction:%ls, Protocol:%lsã€‚\r\n"
+         "pid:%d, processPath:%lsã€‚\r\n\r\n",
          SourceIp, notification->SourcePort, DestinationIp, notification->DestinationPort,
          notification->Direction ? L"INBOUND" : L"OUTBOUND",
          get_protocol_name(notification->Protocol),

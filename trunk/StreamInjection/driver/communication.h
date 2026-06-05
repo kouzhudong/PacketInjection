@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "DriverEntry.h"
 
@@ -13,16 +13,16 @@
 Maximum URL length is 2,083 characters in Internet Explorer
 https://support.microsoft.com/en-us/help/208427/maximum-url-length-is-2-083-characters-in-internet-explorer
 
-UrlHash/UrlIsA/UrlGetLocationA/UrlUnescapeW/_tagCOMPONENTµÈº¯ÊıºÍ½á¹¹¶¼Ê¹ÓÃÁËINTERNET_MAX_URL_LENGTH.
+UrlHash/UrlIsA/UrlGetLocationA/UrlUnescapeW/_tagCOMPONENTç­‰å‡½æ•°å’Œç»“æ„éƒ½ä½¿ç”¨äº†INTERNET_MAX_URL_LENGTH.
 
 URL Length Limits
 https://blogs.msdn.microsoft.com/ieinternals/2014/08/13/url-length-limits/
-ÀïËµ:WinINET.h defines INTERNET_MAX_URL_LENGTH as 2083 characters.
+é‡Œè¯´:WinINET.h defines INTERNET_MAX_URL_LENGTH as 2083 characters.
 
-ÎÄ¼şºÍ×¢²á±íµÄ¼«ÏŞÊÇ1024.
-½ø³ÌºÍÂ·¾¶µÄ¼«ÏŞÊÇ32767.
+æ–‡ä»¶å’Œæ³¨å†Œè¡¨çš„æé™æ˜¯1024.
+è¿›ç¨‹å’Œè·¯å¾„çš„æé™æ˜¯32767.
 
-ËùÒÔ»¹²ÉÓÃÕâ¸öÊıÖµ.
+æ‰€ä»¥è¿˜é‡‡ç”¨è¿™ä¸ªæ•°å€¼.
 */
 #define MAX_URL_LEN (32 * 1024)
 
@@ -35,7 +35,7 @@ typedef enum _NETWORK_TYPE{
 
 
 typedef struct _PACKET_INFO {
-    PVOID pending_packer;//½ö¹©ÄÚºËÊ¹ÓÃ,ÊÇPPENDED_PACKET,ÓÃÓÚÑéÖ¤.
+    PVOID pending_packer;//ä»…ä¾›å†…æ ¸ä½¿ç”¨,æ˜¯PPENDED_PACKET,ç”¨äºéªŒè¯.
 
     NETWORK_TYPE type;
 

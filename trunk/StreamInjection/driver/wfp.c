@@ -1,4 +1,4 @@
-#include "wfp.h"
+﻿#include "wfp.h"
 #include "communication.h"
 #include "DriverEntry.h"
 #include "..\public\public.h"
@@ -16,10 +16,10 @@ HANDLE g_Stream_InjectionHandle;
 
 CALLOUTID g_CallOutId;
 
-LIST_ENTRY g_flowContextList;//�����ռ��ʹ���(TCP��UDP��)��Ϣ��FLOW_DATA����.
+LIST_ENTRY g_flowContextList;//用于收集和传递(TCP和UDP等)信息的FLOW_DATA链表.
 KSPIN_LOCK g_flowContextListLock;
 
-LIST_ENTRY g_PacketList;/*PENDED_PACKET���͵�����,���ڱ���TCP��UDP�Ĳ���.*/
+LIST_ENTRY g_PacketList;/*PENDED_PACKET类型的链表,用于保存TCP和UDP的操作.*/
 KSPIN_LOCK g_PacketListLock;
 
 
@@ -28,9 +28,9 @@ KSPIN_LOCK g_PacketListLock;
 
 void GetFlagsIndexesForLayer(_In_ UINT16 layerId, _Out_ UINT * flagsIndex)
 /*
-ժ�ԣ�\Windows-driver-samples\network\trans\inspect\sys\utils.h
+摘自：\Windows-driver-samples\network\trans\inspect\sys\utils.h
 
-��ȷ����FWPS_BUILTIN_LAYERS_��˳�򲹳���ϡ�
+正确按照FWPS_BUILTIN_LAYERS_的顺序补充完毕。
 */
 {
     switch (layerId) {
@@ -86,9 +86,9 @@ void GetFlagsIndexesForLayer(_In_ UINT16 layerId, _Out_ UINT * flagsIndex)
 
 void GetNetWorkInfo(const FWPS_INCOMING_VALUES* pClassifyValues, OUT PPENDED_PACKET packet)
 /*
-���ܣ���ȡһЩ������Ϣ���Ա㷵�ظ�Ӧ�ò㡣
+功能：获取一些网络信息，以便返回给应用层。
 
-���Ǹ�ֵ��Ӧ�ö���һ����
+凡是赋值的应该断言一样。
 */
 {
     switch (pClassifyValues->layerId)
@@ -177,10 +177,11 @@ void DereferenceFlowContext(_Inout_ PFLOW_DATA flowContext)
     }
 
     ASSERT(flowContext->refCount > 0);
-    InterlockedDecrement(&flowContext->refCount);
-
-    if (flowContext->refCount == 0) {
-        ExFreePoolWithTag(flowContext->sid, TAG);
+    //必须用InterlockedDecrement的返回值判0；“减完再读refCount”非原子，并发会漏放或双重释放。
+    if (0 == InterlockedDecrement(&flowContext->refCount)) {
+        if (NULL != flowContext->sid) {//sid可能为NULL(流无ALE_USER_ID)，ExFreePoolWithTag(NULL)会蓝屏。
+            ExFreePoolWithTag(flowContext->sid, TAG);
+        }
         ExFreePoolWithTag(flowContext->processPath, TAG);
 
         ExFreePoolWithTag(flowContext, TAG);
@@ -234,7 +235,7 @@ PPENDED_PACKET BuildStreamPendPacket(FWPS_STREAM_DATA * streamData, PFLOW_DATA f
     packet->NetBufferList = ClonedNbl;
     packet->DataLength = streamData->dataLength;
 
-    ReferenceFlowContext(flowContextLocal);/*��ֹ�ڴ汻�ͷ�*/
+    ReferenceFlowContext(flowContextLocal);/*防止内存被释放*/
     //FwpsReferenceNetBufferList(packet->NetBufferList, TRUE);
 
     return packet;
@@ -263,7 +264,7 @@ PPENDED_PACKET BuildDataGramPendPacket(_In_ const FWPS_INCOMING_VALUES * inFixed
     
     packet->belongingFlow = flowContextLocal;
 
-    ReferenceFlowContext(flowContextLocal);/*��ֹ�ڴ汻�ͷ�*/
+    ReferenceFlowContext(flowContextLocal);/*防止内存被释放*/
 
     if (flowContextLocal->addressFamily == AF_INET) {
         packet->direction = inFixedValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_DIRECTION].value.uint32;
@@ -339,7 +340,7 @@ void NTAPI StreamClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
                             _Inout_ FWPS_CLASSIFY_OUT0 * pClassifyOut
 )
 /*
-����Ҫʹ��FwpsQueryPacketInjectionState����ȷ���ڶ���������������NET_BUFFER_LIST*��
+这里要使用FwpsQueryPacketInjectionState，请确定第二个参数，类型是NET_BUFFER_LIST*。
 */
 {
     PFLOW_DATA flowData = *(PFLOW_DATA *)(UINT64 *)&flowContext;
@@ -360,9 +361,9 @@ void NTAPI StreamClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     UNREFERENCED_PARAMETER(filter);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //�Ź�һЩ������
+    //放过一些处理。
 
-    pClassifyOut->actionType = FWP_ACTION_CONTINUE;//���������Ҫ���ã������ϲ������ˡ�    
+    pClassifyOut->actionType = FWP_ACTION_CONTINUE;//谨记这个重要设置，否则上不了网了。    
 
     GetFlagsIndexesForLayer(pClassifyValues->layerId, &flagsIndex);
     flags = pClassifyValues->incomingValue[flagsIndex].value.uint32;
@@ -431,7 +432,7 @@ void NTAPI StreamClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         }
     } __finally {
         if (IsExit) {
-            IoPacket->countBytesEnforced = 0;//Ҫ��Ҫ���ϣ�������ϡ�
+            IoPacket->countBytesEnforced = 0;//要不要加上？建议加上。
             return;
         }
     }
@@ -448,10 +449,20 @@ void NTAPI StreamClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
           streamData->dataLength,
           streamData->netBufferListChain);
 
+    //自注入的流数据不再处理，避免无限重注入循环(worker用FwpsStreamInjectAsync注回的数据会重入本回调)。
+    if (streamData->netBufferListChain != NULL) {
+        FWPS_PACKET_INJECTION_STATE injectionState =
+            FwpsQueryPacketInjectionState(g_Stream_InjectionHandle, streamData->netBufferListChain, NULL);
+        if (injectionState == FWPS_PACKET_INJECTED_BY_SELF ||
+            injectionState == FWPS_PACKET_PREVIOUSLY_INJECTED_BY_SELF) {
+            return;//actionType已是FWP_ACTION_CONTINUE，放行自注入数据。
+        }
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ����һ���ڵ�����.
+    申请一个节点数据.
     */
     packet = BuildStreamPendPacket(streamData, flowData);
     if (NULL == packet) {
@@ -460,21 +471,22 @@ void NTAPI StreamClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         return;
     }
 
-    //�ٻ�ȡ����Ϣ��
-    GetNetWorkInfo(pClassifyValues, packet);
+    //不再调用GetNetWorkInfo：它把数据写入【共享】flow上下文(belongingFlow是指针)，classify多CPU并发→数据竞争；
+    //且5元组在ALE_FLOW_ESTABLISHED时已由AssociateOneContext填好。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
-    /*����ڵ�����.*/
-    ReferenceFlowContext(flowData);
+    /*插入节点数据.*/
+    //packet已在BuildStreamPendPacket里对flow加了引用，这里无需再Ref/Deref(原来的一对是多余的)。
     KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &LockHandle);
     InsertTailList(&g_PacketList, &packet->listEntry);
     KeReleaseInStackQueuedSpinLock(&LockHandle);
-    DereferenceFlowContext(flowData);
+
+    KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);//唤醒工作线程处理，取代1秒轮询。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
-    //������
+    //丢包。
 
     IoPacket->streamAction = FWPS_STREAM_ACTION_NONE;
     IoPacket->countBytesRequired = 0;
@@ -506,7 +518,7 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     UNREFERENCED_PARAMETER(classifyContext);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //�Ź�һЩ������
+    //放过一些处理。
 
     _Analysis_assume_(layerData != NULL);
     ASSERT(layerData != NULL);
@@ -539,25 +551,30 @@ void NTAPI DataGramClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues
     //////////////////////////////////////////////////////////////////////////////////////////////
 
      /*
-     ��ȡ/����һ���ڵ���Ϣ.
+     获取/制作一个节点信息.
      */
     packet = BuildDataGramPendPacket(pClassifyValues, pMetadata, layerData, flowData);
     if (packet == NULL) {
-        pClassifyOut->actionType = FWP_ACTION_BLOCK;
-        pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        //建包失败(如低内存)：放行而不是BLOCK，避免丢弃用户流量(fail-open)。
+        pClassifyOut->actionType = FWP_ACTION_PERMIT;
+        if (filter->flags & FWPS_FILTER_FLAG_CLEAR_ACTION_RIGHT) {
+            pClassifyOut->rights &= ~FWPS_RIGHT_ACTION_WRITE;
+        }
         return;
     }
 
-    GetNetWorkInfo(pClassifyValues, packet);
+    //不再调用GetNetWorkInfo：避免并发改写共享flow上下文(见StreamClassifyFn说明)。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    ����һ���ڵ�.
+    插入一个节点.
     */
     KeAcquireInStackQueuedSpinLock(&g_PacketListLock, &lockHandle);
     InsertTailList(&g_PacketList, &packet->listEntry);
     KeReleaseInStackQueuedSpinLock(&lockHandle);
+
+    KeSetEvent(&g_PacketEvent, IO_NO_INCREMENT, FALSE);//唤醒工作线程处理，取代1秒轮询。
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -578,16 +595,16 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
         KLOCK_QUEUE_HANDLE lockHandle;
 
         KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
-        RemoveEntryList(&flowData->listEntry);//���������Ȼ������?
+        RemoveEntryList(&flowData->listEntry);//这个链表竟然出问题?
         KeReleaseInStackQueuedSpinLock(&lockHandle);
     }
 
     ASSERT(flowData->refCount > 0);
-    InterlockedDecrement(&flowData->refCount);
-
-    if (flowData->refCount == 0) {
-
-        ExFreePoolWithTag(flowData->sid, TAG);
+    //同上：必须用返回值原子判0。
+    if (0 == InterlockedDecrement(&flowData->refCount)) {
+        if (NULL != flowData->sid) {//sid可能为NULL，ExFreePoolWithTag(NULL)会蓝屏。
+            ExFreePoolWithTag(flowData->sid, TAG);
+        }
         ExFreePoolWithTag(flowData->processPath, TAG);
 
         ExFreePoolWithTag(flowData, TAG);
@@ -623,18 +640,20 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         return;
     }
 
-    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//FwpsFlowAssociateContext���óɹ��˲��ͷš�
-    ASSERT(fc);
-    RtlZeroMemory(fc, sizeof(FLOW_DATA));
+    fc = (PFLOW_DATA)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(FLOW_DATA), TAG);//ExAllocatePool2默认清零。
+    if (NULL == fc) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "%s", "分配FLOW_DATA失败");
+        return;
+    }
 
     PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_TRACE_LEVEL, "trace: allocate context:%p", fc);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /*
-    �������������ã�������ж�ص�ʱ�򣬵���RemoveFlows��������Ҫ������������
-    ���ߣ���ʹ����ж�سɹ��������ٴμ��ػ�ʧ�ܡ�
-    ��Ҳ��FwpsCalloutUnregisterById����STATUS_DEVICE_BUSY��ԭ��
+    这三个必须设置，在驱动卸载的时候，调用RemoveFlows函数，需要这三个参数。
+    否者，即使驱动卸载成功，驱动再次加载会失败。
+    这也是FwpsCalloutUnregisterById返回STATUS_DEVICE_BUSY的原因。
     */
     fc->flowHandle = pMetadata->flowHandle;
     fc->calloutId = calloutId;
@@ -646,10 +665,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4:
     {
         fc->addressFamily = AF_INET;
-        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_PROTOCOL].value.uint16;
+        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_PROTOCOL].value.uint8;//IP_PROTOCOL是FWP_UINT8。
 
         fc->SourceIp.addressFamily = AF_INET;
-        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//����ֵ��������NL_ADDRESS_TYPE
+        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
         fc->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS].value.uint32;
         fc->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_PORT].value.uint16;
 
@@ -657,7 +676,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
         fc->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
 
-        fc->Direction = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_DIRECTION].value.uint16;
+        fc->Direction = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_DIRECTION].value.uint32;//DIRECTION是FWP_UINT32。
 
         sid = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_ALE_USER_ID].value.sid;
 
@@ -674,10 +693,10 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
         fc->addressFamily = AF_INET6;
 
-        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_PROTOCOL].value.uint16;
+        fc->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_PROTOCOL].value.uint8;//IP_PROTOCOL是FWP_UINT8。
 
         fc->SourceIp.addressFamily = AF_INET6;
-        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//����ֵ��������NL_ADDRESS_TYPE
+        //fc->SourceIp.addressFamily = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_LOCAL_ADDRESS_TYPE].value;//返回值的类型是NL_ADDRESS_TYPE
 
         ipv6 = (PIN6_ADDR)pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_LOCAL_ADDRESS].value.byteArray16->byteArray16;
         RtlCopyMemory(&fc->SourceIp.ipv6, ipv6, IPV6_ADDRESS_LENGTH);
@@ -691,7 +710,7 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
         fc->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_IP_REMOTE_PORT].value.uint16;
 
-        fc->Direction = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_DIRECTION].value.uint16;
+        fc->Direction = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_DIRECTION].value.uint32;//DIRECTION是FWP_UINT32。
 
         sid = pClassifyValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V6_ALE_USER_ID].value.sid;
 
@@ -707,10 +726,14 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    //����/������Ϣ��д��
+    //额外/辅助信息填写。
 
     fc->processPath = (WCHAR *)ExAllocatePool2(POOL_FLAG_NON_PAGED, pMetadata->processPath->size, TAG);
-    ASSERT(fc->processPath);
+    if (NULL == fc->processPath) {
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "分配processPath失败，size:%u", pMetadata->processPath->size);
+        ExFreePoolWithTag(fc, TAG);
+        return;
+    }
     memcpy(fc->processPath, pMetadata->processPath->data, pMetadata->processPath->size);
     fc->size = pMetadata->processPath->size;
 
@@ -719,7 +742,12 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
     if (NULL != sid) {
         fc->sidLen = RtlLengthSid(sid);
         fc->sid = (SID*)ExAllocatePool2(POOL_FLAG_NON_PAGED, fc->sidLen, TAG);
-        ASSERT(fc->sid);
+        if (NULL == fc->sid) {
+            PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "分配sid失败，sidLen:%lu", fc->sidLen);
+            ExFreePoolWithTag(fc->processPath, TAG);
+            ExFreePoolWithTag(fc, TAG);
+            return;
+        }
         memcpy(fc->sid, sid, fc->sidLen);
     }
 
@@ -727,14 +755,23 @@ VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 
+    //关联与入链需在锁内原子完成：关联成功后FlowDeleteFn可能立刻触发，它要在链中找到本节点(并持同一锁)。
     KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
 
     status = FwpsFlowAssociateContext(pMetadata->flowHandle, layerId, calloutId, (UINT64)fc);
     if (!NT_SUCCESS(status)) {
-        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "erroe: status:%#x, CalloutId:%x", status, calloutId);
+        //关联失败：必须释放fc且不入链。否则fc泄漏，且未绑定flow的上下文留在链里，RemoveFlows无法回收。
+        KeReleaseInStackQueuedSpinLock(&lockHandle);
+        PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "error: status:%#x, CalloutId:%x", status, calloutId);
+        if (NULL != fc->sid) {
+            ExFreePoolWithTag(fc->sid, TAG);
+        }
+        ExFreePoolWithTag(fc->processPath, TAG);
+        ExFreePoolWithTag(fc, TAG);
+        return;
     }
 
-    InsertTailList(&g_flowContextList, &fc->listEntry);//g_flowContextList���ƻ���
+    InsertTailList(&g_flowContextList, &fc->listEntry);
 
     KeReleaseInStackQueuedSpinLock(&lockHandle);
 }
@@ -759,36 +796,36 @@ void NTAPI EstablishedClassifyFn(_In_ const FWPS_INCOMING_VALUES0 * pClassifyVal
     ASSERT(pMetadata->processPath->size);
 
     /*
-    ���Կ��Ƕ�һ��������б����������������ģ������ֿ�дһ�������������ּ��ˡ�
-    ���ǣ��������ܻ��ж���ĺ����õ������ġ�
+    可以考虑对一个数组进行遍历进行添加上下文，这样又可写一个函数，这样又简单了。
+    但是，这样可能会有多余的和无用的上下文。
     */
     switch (pClassifyValues->layerId) {
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4:
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4, g_CallOutId.DATAGRAM_DATA_V4);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V4, g_CallOutId.STREAM_V4);
 
-        //�ɼ�������.
+        //可继续添加.
 
         break;
-    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD://�����ߵ������û��
+    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD://看看走到这里过没？
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V4_DISCARD, g_CallOutId.DATAGRAM_DATA_V4_DISCARD);
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V4_DISCARD, g_CallOutId.STREAM_V4_DISCARD);
 
-        //�ɼ�������.
+        //可继续添加.
 
         break;
     case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6:
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6, g_CallOutId.DATAGRAM_DATA_V6);
         AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V6, g_CallOutId.STREAM_V6);
 
-        //�ɼ�������.
+        //可继续添加.
 
         break;
-    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD://�����ߵ������û��
+    case FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD://看看走到这里过没？
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_DATAGRAM_DATA_V6_DISCARD, g_CallOutId.DATAGRAM_DATA_V6_DISCARD);
         //AssociateOneContext(pClassifyValues, pMetadata, FWPS_LAYER_STREAM_V6_DISCARD, g_CallOutId.STREAM_V6_DISCARD);
 
-        //�ɼ�������.
+        //可继续添加.
 
         break;
     default:
@@ -817,7 +854,7 @@ VOID RemoveFlows()
 
         flowContext->deleting = TRUE; // We don't want our flow deletion function to try to remove this from the list.        
         KeReleaseInStackQueuedSpinLock(&lockHandle);
-        status = FwpsFlowRemoveContext(flowContext->flowHandle, flowContext->layerId, flowContext->calloutId);//���ӵ���FlowDeleteFn��
+        status = FwpsFlowRemoveContext(flowContext->flowHandle, flowContext->layerId, flowContext->calloutId);//会间接调用FlowDeleteFn。
         KeAcquireInStackQueuedSpinLock(&g_flowContextListLock, &lockHandle);
         if (!NT_SUCCESS(status)) {
             PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, 
@@ -829,9 +866,13 @@ VOID RemoveFlows()
 }
 
 
+//把CALLOUTID当UINT32数组遍历的前提：成员都是连续UINT32、无填充。加成员若破坏此前提需同步修改，用C_ASSERT约束。
+C_ASSERT(sizeof(CALLOUTID) % sizeof(UINT32) == 0);
+
+
 void UnregisterAllCalloutId()
 /*
-������һ��forѭ��ʵ��.
+考虑用一个for循环实现.
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -843,14 +884,11 @@ void UnregisterAllCalloutId()
         if (temp[i]) {
             NtStatus = FwpsCalloutUnregisterById(temp[i]);
             if (!NT_SUCCESS(NtStatus)) {
-                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, 
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
                         "error: i:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
             }
 
-            /*
-            ��Ҫ����,��,��:FreePendedPacket���п����������.����д�����.
-            */
-            //temp[i] = 0;
+            temp[i] = 0;//置零使StopWFP幂等(失败清理+卸载可能各调一次)。卸载已先等worker排空，FreePendedPacket不再读此值。
         }
     }
 }
@@ -937,21 +975,21 @@ NTSTATUS RegisterCallout(__in GUID SystemlayerKey,
                          __in_opt FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0 FlowDeleteFn
 )
 /*
-ע�����紦����
+注册网络处理。
 
-������������
-1.���˵�������
-2.���˵ķֲ�ΪFWPM_SUBLAYER_UNIVERSAL��
-3.Callout��displayData�����ֺ�������
-4.Filter��displayData�����ֺ�������
-5.FWPS_CALLOUT��flags�����á�
-6.FWPM_CALLOUT��flags�����á�
-7.FWPM_FILTER��ĸ��ָ�����ϸ�;�ȷ�����á�
-����Ҫ������Ҫ��ѡ���Ƿ�ʹ�����������
-�����������Ҳ��һ����ͨ���ԣ���ע����ɹ�����������̫�࣬��Ҫ�ڴ��������й��ˡ�
+但，不包含：
+1.过滤的条件。
+2.过滤的分层为FWPM_SUBLAYER_UNIVERSAL。
+3.Callout的displayData的名字和描述。
+4.Filter的displayData的名字和描述。
+5.FWPS_CALLOUT的flags的设置。
+6.FWPM_CALLOUT的flags的设置。
+7.FWPM_FILTER里的各种更加详细和精确的设置。
+所以要根据需要，选择是否使用这个函数。
+不过这个函数也有一定的通用性，即注册大多成功，但是内容太多，需要在处理函数中过滤。
 
-������
-FlowDeleteFn ��û����Ҫ�����ģ�����������ע��ʧ�ܵ�����£����Բ�Ҫ�����ר�Ź��������ĵĲ���û���������Ϊ������û�������ġ�
+参数：
+FlowDeleteFn 在没有需要上下文，或者上下文注册失败的情况下，可以不要这个。专门关联上下文的操作没有这个，因为它自身没有上下文。
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -968,8 +1006,8 @@ FlowDeleteFn ��û����Ҫ�����ģ�����������ע��ʧ�ܵ�����£����Բ�Ҫ�����ר�Ź��
     }
 
     /*
-    ���Կ�����RtlStringFromGUID��GUIDת��Ϊ�ַ�����Ȼ���Ƹ���Ӧ�ĳ�Ա�����滻test�ַ�����
-    ���߰�SystemlayerKeyҲת��Ϊ�ַ�����Ȼ���������ַ���ƴ�ӣ�Ȼ��ֵ�����滻test�ַ�����
+    可以考虑用RtlStringFromGUID把GUID转换为字符串，然后复制给相应的成员，以替换test字符串。
+    或者把SystemlayerKey也转换为字符串，然后和上面的字符串拼接，然后赋值，以替换test字符串。
     */
 
     sCallout.calloutKey = MyCalloutKey;
@@ -1018,8 +1056,8 @@ FlowDeleteFn ��û����Ҫ�����ģ�����������ע��ʧ�ܵ�����£����Բ�Ҫ�����ר�Ź��
 
 NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
 /*
-���Կ�����minifilter������ע������ݽṹ��������ע�ᡣ
-�������������FltRegisterFilter�Ĺ��ܣ����ֶ���FwpsCalloutRegisterFilter����FwpmCalloutRegisterFilter.
+可以考虑像minifilter那样，注册个数据结构的数组来注册。
+这个函数类似与FltRegisterFilter的功能，名字都叫FwpsCalloutRegisterFilter或者FwpmCalloutRegisterFilter.
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -1046,17 +1084,17 @@ NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
 
 
 /*
-GUID���붨��Ϊָ�룬���ߣ����ָ������⡣
+GUID必须定义为指针，否者，出现各种问题。
 */
 CALLOUT_FILTER g_CalloutFilter[] =
 {
-    //������ע�����ĸ�����������Ҳ������ϣ���������һ����NULL��
+    //建议先注册这四个，后面两个也建议加上，这个的最后一个是NULL。
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4,           &g_CallOutId.EstablishedId4,                EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6,           &g_CallOutId.EstablishedId6,                EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4_DISCARD,   &g_CallOutId.EstablishedId4_DISCARD,        EstablishedClassifyFn,  NotifyFn,   0},
     {&FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6_DISCARD,   &g_CallOutId.EstablishedId6_DISCARD,        EstablishedClassifyFn,  NotifyFn,   0},
 
-    //ע��STREAM��صĴ�����
+    //注册STREAM相关的处理。
     {&FWPM_LAYER_STREAM_V4,             &g_CallOutId.STREAM_V4,         StreamClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_STREAM_V4_DISCARD,     &g_CallOutId.STREAM_V4_DISCARD, StreamClassifyFn,  NotifyFn,   FlowDeleteFn},
     {&FWPM_LAYER_STREAM_V6,             &g_CallOutId.STREAM_V6,         StreamClassifyFn,  NotifyFn,   FlowDeleteFn},
@@ -1064,16 +1102,16 @@ CALLOUT_FILTER g_CalloutFilter[] =
     //{&FWPM_LAYER_STREAM_PACKET_V4,      &g_CallOutId.STREAM_PACKET_V4,  StreamClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_STREAM_PACKET_V6,      &g_CallOutId.STREAM_PACKET_V6,  StreamClassifyFn,  NotifyFn,   FlowDeleteFn},
 
-    //ע��DATAGRAM_DATA��صĴ�����
+    //注册DATAGRAM_DATA相关的处理。
     {&FWPM_LAYER_DATAGRAM_DATA_V4,             &g_CallOutId.DATAGRAM_DATA_V4,         DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V4_DISCARD,     &g_CallOutId.DATAGRAM_DATA_V4_DISCARD, DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     {&FWPM_LAYER_DATAGRAM_DATA_V6,             &g_CallOutId.DATAGRAM_DATA_V6,         DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
     //{&FWPM_LAYER_DATAGRAM_DATA_V6_DISCARD,     &g_CallOutId.DATAGRAM_DATA_V6_DISCARD, DataGramClassifyFn,  NotifyFn,   FlowDeleteFn},
 
-    //�����Լ������ӡ�
+    //还可以继续添加。
     //...
 
-    //�����������β��
+    //必须以这个结尾。
     {&NULL_GUID, 0, NULL, NULL, NULL}
 };
 
@@ -1165,9 +1203,9 @@ VOID NTAPI SubscriptionBFEStateChangeCallback(IN OUT void * context, IN FWPM_SER
 /*
 Purpose:  Callback, invoked on BFE service state change, which will get or release a handle to the engine.
 MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
-�����ĵã�
-1.����ϵͳ������ʱ������ FWPM_SERVICE_START_PENDING ������ FWPM_SERVICE_RUNNING ��
-2.�����������ǲ���������ġ�
+测试心得：
+1.操作系统启动的时候先来 FWPM_SERVICE_START_PENDING ，后来 FWPM_SERVICE_RUNNING 。
+2.正常的启动是不会走这里的。
 */
 {
     NTSTATUS status = STATUS_UNSUCCESSFUL;
@@ -1176,16 +1214,16 @@ MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
 
     switch (newState) {
     case FWPM_SERVICE_RUNNING:
-        //����FwpmEngineOpen��ȡEngineHandle��
+        //调用FwpmEngineOpen获取EngineHandle。
         status = RegisterCallouts();
         break;
     case FWPM_SERVICE_STOP_PENDING:
-        //Ҫ�����������һЩС������
-        //����FwpmEngineClose�ͷ�EngineHandle��
+        //要走这里，还得做一些小动作。
+        //调用FwpmEngineClose释放EngineHandle。
         break;
-    case FWPM_SERVICE_STOPPED://ϵͳ������ʱ����������
+    case FWPM_SERVICE_STOPPED://系统启动的时候会是这个。
         break;
-    case FWPM_SERVICE_START_PENDING://����ϵͳ������ʱ���������� 
+    case FWPM_SERVICE_START_PENDING://操作系统启动的时候会有这个。 
         break;
     default:
         break;
@@ -1196,7 +1234,7 @@ MSDN_Ref: HTTP://MSDN.Microsoft.com/En-US/Library/Windows/Hardware/FF550062.aspx
 NTSTATUS StartWFP()
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
-    FWPM_SERVICE_STATE BfeState = FwpmBfeStateGet();//������ж������Ƿ���ϵͳ������״̬��
+    FWPM_SERVICE_STATE BfeState = FwpmBfeStateGet();//这个可判断驱动是否在系统的启动状态。
 
     if (FWPM_SERVICE_RUNNING == BfeState) {//FWPM_SERVICE_STOP_PENDING
         NtStatus = RegisterCallouts();
