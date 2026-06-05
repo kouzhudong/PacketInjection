@@ -96,13 +96,9 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES* pClassifyValues, OUT PPENDED_PAC
     case FWPS_LAYER_STREAM_V4:
     {
         packet->belongingFlow->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_LOCAL_ADDRESS].value.uint32;
-
         packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_LOCAL_PORT].value.uint16;
-
         packet->belongingFlow->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_REMOTE_ADDRESS].value.uint32;
-
         packet->belongingFlow->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_IP_REMOTE_PORT].value.uint16;
-
         packet->belongingFlow->Direction = pClassifyValues->incomingValue[FWPS_FIELD_STREAM_V4_DIRECTION].value.uint16;
 
         break;
@@ -128,15 +124,10 @@ void GetNetWorkInfo(const FWPS_INCOMING_VALUES* pClassifyValues, OUT PPENDED_PAC
     case FWPS_LAYER_DATAGRAM_DATA_V4:
     {
         packet->belongingFlow->Protocol = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_PROTOCOL].value.uint16;
-
         packet->belongingFlow->SourceIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_LOCAL_ADDRESS].value.uint32;
-
         packet->belongingFlow->SourcePort = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_LOCAL_PORT].value.uint16;
-
         packet->belongingFlow->DestinationIp.ipv4.S_un.S_addr = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_REMOTE_ADDRESS].value.uint32;
-
         packet->belongingFlow->DestinationPort = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_IP_REMOTE_PORT].value.uint16;
-
         packet->belongingFlow->Direction = pClassifyValues->incomingValue[FWPS_FIELD_DATAGRAM_DATA_V4_DIRECTION].value.uint16;
 
         break;
@@ -614,9 +605,7 @@ VOID NTAPI FlowDeleteFn(IN UINT16 layerId, IN UINT32 calloutId, IN UINT64 flowCo
 }
 
 
-NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, 
-                  _In_ const GUID * filterKey,
-                  _Inout_ FWPS_FILTER3 * filter)
+NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType, _In_ const GUID * filterKey, _Inout_ FWPS_FILTER3 * filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -626,10 +615,7 @@ NTSTATUS NotifyFn(_In_ FWPS_CALLOUT_NOTIFY_TYPE notifyType,
 }
 
 
-VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues,
-                         _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata,
-                         UINT16 layerId,
-                         UINT32 calloutId)
+VOID AssociateOneContext(_In_ const FWPS_INCOMING_VALUES0 * pClassifyValues, _In_ const FWPS_INCOMING_METADATA_VALUES0 * pMetadata, UINT16 layerId, UINT32 calloutId)
 {
     PFLOW_DATA fc = NULL;
     NTSTATUS status = STATUS_SUCCESS;
@@ -876,19 +862,17 @@ void UnregisterAllCalloutId()
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
-    UINT32 counter = sizeof(CALLOUTID) / sizeof(UINT32);//_ARRAYSIZE(g_CallOutId);
-    UINT32 i = 0;
+    UINT32 counter = sizeof(CALLOUTID) / sizeof(UINT32); //_ARRAYSIZE(g_CallOutId);
     PUINT32 temp = (PUINT32)&g_CallOutId;
 
-    for (; i < counter; i++) {
+    for (UINT32 i = 0; i < counter; i++) {
         if (temp[i]) {
             NtStatus = FwpsCalloutUnregisterById(temp[i]);
             if (!NT_SUCCESS(NtStatus)) {
-                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL,
-                        "error: i:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
+                PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_WARNING_LEVEL, "error: i:%d, id:%#x, NtStatus:%#x", i, temp[i], NtStatus);
             }
 
-            temp[i] = 0;//置零使StopWFP幂等(失败清理+卸载可能各调一次)。卸载已先等worker排空，FreePendedPacket不再读此值。
+            temp[i] = 0; // 置零使StopWFP幂等(失败清理+卸载可能各调一次)。卸载已先等worker排空，FreePendedPacket不再读此值。
         }
     }
 }
@@ -897,10 +881,9 @@ void UnregisterAllCalloutId()
 void ShowCalloutId()
 {
     UINT32 counter = sizeof(CALLOUTID) / sizeof(UINT32);
-    UINT32 i = 0;
     PUINT32 temp = (PUINT32)&g_CallOutId;
 
-    for (; i < counter; i++) {
+    for (UINT32 i = 0; i < counter; i++) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_INFO_LEVEL, "info: i:%d, id:%#x", i, temp[i]);
     }
 }
@@ -958,9 +941,7 @@ void StopWFP()
     }
 
     RemoveFlows();
-
     UnregisterAllCalloutId();
-
     DestroyInjectionHandle();
 }
 
@@ -992,14 +973,13 @@ NTSTATUS RegisterCallout(__in GUID SystemlayerKey,
 FlowDeleteFn 在没有需要上下文，或者上下文注册失败的情况下，可以不要这个。专门关联上下文的操作没有这个，因为它自身没有上下文。
 */
 {
-    NTSTATUS NtStatus = STATUS_SUCCESS;
     FWPS_CALLOUT sCallout = {0};
     FWPM_CALLOUT mCallout = {0};
     FWPM_DISPLAY_DATA displayData = {0};
     FWPM_FILTER filter = {0};
     GUID MyCalloutKey;
 
-    NtStatus = ExUuidCreate(&MyCalloutKey);
+    NTSTATUS NtStatus = ExUuidCreate(&MyCalloutKey);
     if (!NT_SUCCESS(NtStatus)) {
         PrintEx(DPFLTR_IHVNETWORK_ID, DPFLTR_ERROR_LEVEL, "error: status:%#x", NtStatus);
         return NtStatus;
@@ -1061,9 +1041,8 @@ NTSTATUS FwpsCalloutRegisterFilter(_In_ CONST PCALLOUT_FILTER Registration)
 */
 {
     NTSTATUS NtStatus = STATUS_SUCCESS;
-    int i = 0;
 
-    for (i = 0; ; i++) {
+    for (int i = 0;; i++) {
         if (IsEqualGUID(&NULL_GUID, Registration[i].SystemlayerKey)) {
             break;
         }
